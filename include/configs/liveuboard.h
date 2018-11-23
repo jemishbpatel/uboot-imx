@@ -20,6 +20,7 @@
 #define CONFIG_MXC_UART
 #define CONFIG_MXC_UART_BASE		UART1_BASE
 
+#define CONFIG_MXC_SPI
 /* SATA Configs */
 
 #ifdef CONFIG_CMD_SATA
