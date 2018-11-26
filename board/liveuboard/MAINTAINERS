@@ -1,0 +1,6 @@
+LIVEUBOARD BOARD
+M:	Jemish Patel <jemish@liveu.tv>
+S:	Maintained
+F:	board/liveuboard/
+F:	include/configs/liveuboard.h
+F:	configs/liveuboard_defconfig

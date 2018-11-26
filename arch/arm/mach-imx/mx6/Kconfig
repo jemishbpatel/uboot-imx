@@ -454,6 +454,12 @@ config TARGET_WANDBOARD
 	select BOARD_LATE_INIT
 	select SUPPORT_SPL
 
+config TARGET_LIVEUBOARD
+	bool "liveuboard"
+	select BOARD_LATE_INIT
+	select MX6QDL
+	select SUPPORT_SPL
+
 config TARGET_WARP
 	bool "WaRP"
 	select MX6SL
@@ -534,6 +540,7 @@ source "board/k+p/kp_imx6q_tpc/Kconfig"
 source "board/udoo/Kconfig"
 source "board/udoo/neo/Kconfig"
 source "board/wandboard/Kconfig"
+source "board/liveuboard/Kconfig"
 source "board/warp/Kconfig"
 
 endif

@@ -1,0 +1,9 @@
+if TARGET_LIVEUBOARD
+
+config SYS_BOARD
+	default "liveuboard"
+
+config SYS_CONFIG_NAME
+	default "liveuboard"
+
+endif
