@@ -88,7 +88,7 @@ u32 spl_boot_device(void)
 	/* MMC/eMMC: 8.5.3 */
 	case IMX6_BMODE_MMC:
 	case IMX6_BMODE_EMMC:
-		return BOOT_DEVICE_MMC1;
+		return BOOT_DEVICE_MMC2_2;
 	/* NAND Flash: 8.5.2, Table 8-10 */
 	case IMX6_BMODE_NAND_MIN ... IMX6_BMODE_NAND_MAX:
 		return BOOT_DEVICE_NAND;
@@ -169,6 +169,10 @@ u32 spl_boot_mode(const u32 boot_device)
 #else
 		return MMCSD_MODE_RAW;
 #endif
+		break;
+	/* Added case for eMMC to distinguished from SD card */
+	case BOOT_DEVICE_MMC2_2:
+		return MMCSD_MODE_EMMCBOOT;
 		break;
 	default:
 		puts("spl: ERROR:  unsupported device\n");
