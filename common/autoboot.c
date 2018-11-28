@@ -208,10 +208,21 @@ static int __abortboot(int bootdelay)
 static int menukey;
 #endif
 
+#if defined(CONFIG_LIVEUBORAD_PASSWORD)
+/* LIVEUBORAD U-Boot PASSWORD */
+static const char PASSWORD [] = "letmeinside!\r";
+#endif
+
 static int __abortboot(int bootdelay)
 {
 	int abort = 0;
 	unsigned long ts;
+
+#if defined(CONFIG_LIVEUBORAD_PASSWORD)
+	unsigned int state = 0;
+	char ch;
+	unsigned int logindelay = 20;
+#endif
 
 #ifdef CONFIG_MENUPROMPT
 	printf(CONFIG_MENUPROMPT);
@@ -251,6 +262,33 @@ static int __abortboot(int bootdelay)
 
 	putc('\n');
 
+#if defined(CONFIG_LIVEUBORAD_PASSWORD)
+	if (abort) {
+		printf("* * * * * * * type password to login * * * * * * *\n");
+		abort = 0;
+		while ((logindelay > 0) && (!abort)) {
+			int i;
+			--logindelay;
+			for (i = 0; !abort && i < 100; ++i) {
+				if (tstc()) {
+					ch = getc();
+					if(ch == PASSWORD[state])
+						state++;
+					else if(ch == PASSWORD[0])
+						state = 1;
+					else
+						state = 0;
+					if (state == (sizeof(PASSWORD)-1)) {
+						abort = 1;
+						printf("Welcome to uboot setup\n");
+						break;
+					}
+				}
+				udelay(10000);
+			}
+		}
+	}
+#endif
 	return abort;
 }
 # endif	/* CONFIG_AUTOBOOT_KEYED */

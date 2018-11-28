@@ -284,4 +284,7 @@ config MISC_INIT_R
 config CONFIGURE_FAN
 	bool "Enable FAN controller configuration for LiveU boards"
 
+config LIVEUBORAD_PASSWORD
+	bool "Enable Password for LiveU boards"
+
 endmenu
