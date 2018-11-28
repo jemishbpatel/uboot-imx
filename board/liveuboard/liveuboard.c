@@ -58,6 +58,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
 
+#define I2C_BUS_0		0
+#define SET_I2C_BUS(x)		I2C_BUS_##x
 /* Enabled Marvell switch MV88E6176 u-boot post command and
    SMI device address generated using ADDR[4:1] pull up pin
    configuration of marvell switch
@@ -253,7 +255,23 @@ int board_phy_config(struct phy_device *phydev)
 }
 
 
-#if defined(CONFIG_VIDEO_IPUV3)
+static struct i2c_pads_info mx6q_i2c1_pad_info = {
+	.scl = {
+		.i2c_mode = MX6Q_PAD_EIM_D21__I2C1_SCL
+			| MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gpio_mode = MX6Q_PAD_EIM_D21__GPIO3_IO21
+			| MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gp = IMX_GPIO_NR(3, 21)
+	},
+	.sda = {
+		.i2c_mode = MX6Q_PAD_EIM_D28__I2C1_SDA
+			| MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gpio_mode = MX6Q_PAD_EIM_D28__GPIO3_IO28
+			| MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gp = IMX_GPIO_NR(3, 28)
+	}
+};
+
 struct i2c_pads_info mx6q_i2c2_pad_info = {
 	.scl = {
 		.i2c_mode = MX6Q_PAD_KEY_COL3__I2C2_SCL
@@ -271,23 +289,6 @@ struct i2c_pads_info mx6q_i2c2_pad_info = {
 	}
 };
 
-struct i2c_pads_info mx6dl_i2c2_pad_info = {
-	.scl = {
-		.i2c_mode = MX6DL_PAD_KEY_COL3__I2C2_SCL
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gpio_mode = MX6DL_PAD_KEY_COL3__GPIO4_IO12
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(4, 12)
-	},
-	.sda = {
-		.i2c_mode = MX6DL_PAD_KEY_ROW3__I2C2_SDA
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gpio_mode = MX6DL_PAD_KEY_ROW3__GPIO4_IO13
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(4, 13)
-	}
-};
-
 struct i2c_pads_info mx6q_i2c3_pad_info = {
 	.scl = {
 		.i2c_mode = MX6Q_PAD_GPIO_5__I2C3_SCL
@@ -300,23 +301,6 @@ struct i2c_pads_info mx6q_i2c3_pad_info = {
 		.i2c_mode = MX6Q_PAD_GPIO_16__I2C3_SDA
 			| MUX_PAD_CTRL(I2C_PAD_CTRL),
 		.gpio_mode = MX6Q_PAD_GPIO_16__GPIO7_IO11
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(7, 11)
-	}
-};
-
-struct i2c_pads_info mx6dl_i2c3_pad_info = {
-	.scl = {
-		.i2c_mode = MX6DL_PAD_GPIO_5__I2C3_SCL
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gpio_mode = MX6DL_PAD_GPIO_5__GPIO1_IO05
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gp = IMX_GPIO_NR(1, 5)
-	},
-	.sda = {
-		.i2c_mode = MX6DL_PAD_GPIO_16__I2C3_SDA
-			| MUX_PAD_CTRL(I2C_PAD_CTRL),
-		.gpio_mode = MX6DL_PAD_GPIO_16__GPIO7_IO11
 			| MUX_PAD_CTRL(I2C_PAD_CTRL),
 		.gp = IMX_GPIO_NR(7, 11)
 	}
@@ -412,6 +396,7 @@ struct display_info_t const displays[] = {{
 } } };
 size_t display_count = ARRAY_SIZE(displays);
 
+#if defined(CONFIG_VIDEO_IPUV3)
 static void setup_display(void)
 {
 	struct mxc_ccm_reg *mxc_ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
@@ -550,6 +535,62 @@ int board_late_init(void)
 	return 0;
 }
 
+#if defined(CONFIG_CONFIGURE_FAN)
+#define FAN_CONTROLLER_SLAVE_ADDR_18		(0x18)
+int configure_fan(uchar i2c_bus_number, uchar chipAddr)
+{
+	uint   regAddr;
+	uchar   value;
+
+	i2c_set_bus_num(i2c_bus_number);
+
+	regAddr = 0x0; value = 0x69;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x1; value = 0x3;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x4; value = 0x80;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x20; value = 0x1d;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x24; value = 0x51;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x25; value = 0x51;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	regAddr = 0x21; value = 0x60;
+	if (i2c_write(chipAddr, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the fan controller 0x%x register.\n",
+				regAddr);
+
+	return 0;
+}
+#endif
+
+int misc_init_r(void)
+{
+#ifdef CONFIG_CONFIGURE_FAN
+	configure_fan(SET_I2C_BUS(0), FAN_CONTROLLER_SLAVE_ADDR_18);
+#endif
+	return 0;
+}
+
 int board_init(void)
 {
 	/* address of boot parameters */
@@ -558,17 +599,10 @@ int board_init(void)
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
-
+	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c1_pad_info);
+	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c2_pad_info);
+	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c3_pad_info);
 #if defined(CONFIG_VIDEO_IPUV3)
-	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6dl_i2c2_pad_info);
-	if (is_mx6dq() || is_mx6dqp()) {
-		setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c2_pad_info);
-		setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c3_pad_info);
-	} else {
-		setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6dl_i2c2_pad_info);
-		setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6dl_i2c3_pad_info);
-	}
-
 	setup_display();
 #endif
 

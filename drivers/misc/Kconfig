@@ -277,4 +277,11 @@ config GDSYS_RXAUI_CTRL
 	depends on MISC
 	help
 	  Support gdsys FPGA's RXAUI control.
+
+config MISC_INIT_R
+	bool "Platform indepedent miscellaneous initialization"
+
+config CONFIGURE_FAN
+	bool "Enable FAN controller configuration for LiveU boards"
+
 endmenu
