@@ -5,6 +5,12 @@ config BITBANGMII
 config MV88E6352_SWITCH
 	bool "Marvell 88E6352 switch support"
 
+config MV88E6176_SWITCH
+	bool "Marvel MV88E6176 Ethernet switch PHY support"
+
+config MV88E6176_CMD
+	bool "Marvel MV88E6176 Ethernet switch registers read/write support"
+
 menuconfig PHYLIB
 	bool "Ethernet PHY (physical media interface) support"
 	depends on NET

@@ -493,6 +493,12 @@ static int fec_open(struct eth_device *edev)
 		}
 		speed = fec->phydev->speed;
 	}
+	/* LiveU: As we don't have PHY, this always returns speed 1000 Mbps.
+	   Previously marvell switch's IMX6 connection port was configured for 1G
+	   so ethernet was working fine at u-boot level. Now as we restricted marvell
+	   switch's IMX6 port to 100 Mbps, speed needs to hardcode to 100
+	*/
+	speed = _100BASET;
 #elif CONFIG_FEC_FIXED_SPEED
 	speed = CONFIG_FEC_FIXED_SPEED;
 #else

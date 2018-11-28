@@ -32,6 +32,7 @@
 #include <i2c.h>
 #include <power/pmic.h>
 #include <power/pfuze100_pmic.h>
+#include <mv88e6176.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -55,8 +56,13 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
-#define ETH_PHY_AR8035_POWER	IMX_GPIO_NR(7, 13)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
+
+/* Enabled Marvell switch MV88E6176 u-boot post command and
+   SMI device address generated using ADDR[4:1] pull up pin
+   configuration of marvell switch
+*/
+#define MV88E6176_ADDRESS	0x1E
 
 static bool with_pmic;
 
@@ -116,9 +122,27 @@ static iomux_v3_cfg_t const enet_pads[] = {
 	IOMUX_PADS(PAD_EIM_D29__GPIO3_IO29    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
-static iomux_v3_cfg_t const enet_ar8035_power_pads[] = {
-	/* AR8035 POWER */
-	IOMUX_PADS(PAD_GPIO_18__GPIO7_IO13    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+/* Marvell MV88E6176 switch configuration */
+static struct mv88e6176_sw_reg switch_conf[] = {
+	/* port 1, FRONT_MDI, autoneg */
+	{ PORT(0), PORT_PHY, FULL_DPX | FULL_DPX_FOR | NO_SPEED_FOR },
+	{ PORT(1), PORT_PHY, FULL_DPX | FULL_DPX_FOR | SPEED_100_FOR },
+	{ PORT(2), PORT_PHY, FULL_DPX | FULL_DPX_FOR | SPEED_100_FOR },
+	{ PORT(5), PORT_PHY, FULL_DPX | FULL_DPX_FOR | SPEED_100_FOR | LINK_FOR | LINK_VAL },
+	{ PORT(6), PORT_PHY, FULL_DPX | FULL_DPX_FOR | SPEED_100_FOR | LINK_FOR | LINK_VAL | TX_RGMII_TIM | RX_RGMII_TIM },
+	{ PORT(0), PORT_CTRL, FORWARDING | EGRS_FLD_ALL },
+	{ PORT(1), PORT_CTRL, FORWARDING | EGRS_FLD_ALL },
+	{ PORT(2), PORT_CTRL, FORWARDING | EGRS_FLD_ALL },
+	{ PORT(5), PORT_CTRL, FORWARDING | EGRS_FLD_ALL },
+	{ PORT(6), PORT_CTRL, FORWARDING | EGRS_FLD_ALL },
+	{ PHY(0), PHY_1000_CTRL, NO_ADV },
+	{ PHY(1), PHY_1000_CTRL, NO_ADV },
+	{ PHY(2), PHY_1000_CTRL, NO_ADV },
+	{ PHY(0), PHY_CTRL, PHY_1_GBPS | AUTONEG_EN | FULL_DUPLEX },
+	{ PHY(1), PHY_CTRL, PHY_100_MBPS | AUTONEG_EN | FULL_DUPLEX | PHY_RESET | 0x200 },
+	{ PHY(2), PHY_CTRL, PHY_100_MBPS | AUTONEG_EN | FULL_DUPLEX | PHY_RESET | 0x200 },
+	{ PHY(0), PHY_1000_CTRL, 0x0E00 },
+	{ GLOBAL2, SCRATCH_MISC, (GP_PIN_CTRL3 << 8) | CLK_125MHZ | DATA_UPDATE }
 };
 
 static iomux_v3_cfg_t const rev_detection_pad[] = {
@@ -133,14 +157,6 @@ static void setup_iomux_uart(void)
 static void setup_iomux_enet(void)
 {
 	SETUP_IOMUX_PADS(enet_pads);
-
-	if (with_pmic) {
-		SETUP_IOMUX_PADS(enet_ar8035_power_pads);
-		/* enable AR8035 POWER */
-		gpio_direction_output(ETH_PHY_AR8035_POWER, 0);
-	}
-	/* wait until 3.3V of PHY and clock become stable */
-	mdelay(10);
 
 	/* Reset AR8031 PHY */
 	gpio_direction_output(ETH_PHY_RESET, 0);
@@ -230,42 +246,9 @@ void setup_spi(void)
 	SETUP_IOMUX_PADS(ecspi2_pads);
 }
 #endif
-static int ar8031_phy_fixup(struct phy_device *phydev)
-{
-	unsigned short val;
-	int mask;
-
-	/* To enable AR8031 ouput a 125MHz clk from CLK_25M */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
-
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
-	if (with_pmic)
-		mask = 0xffe7;	/* AR8035 */
-	else
-		mask = 0xffe3;	/* AR8031 */
-
-	val &= mask;
-	val |= 0x18;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
-
-	/* introduce tx clock delay */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x5);
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
-	val |= 0x0100;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
-
-	return 0;
-}
 
 int board_phy_config(struct phy_device *phydev)
 {
-	ar8031_phy_fixup(phydev);
-
-	if (phydev->drv->config)
-		phydev->drv->config(phydev);
-
 	return 0;
 }
 
@@ -447,6 +430,22 @@ static void setup_display(void)
 	gpio_direction_input(IMX_GPIO_NR(4, 20));
 }
 #endif /* CONFIG_VIDEO_IPUV3 */
+
+int last_stage_init(void)
+{
+	/* configure MV88E6176 switch */
+	char *name = "FEC";
+
+	if (miiphy_set_current_dev(name))
+		return 0;
+
+	mv88e6176_sw_program(name, MV88E6176_ADDRESS, switch_conf,
+	ARRAY_SIZE(switch_conf));
+
+	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
+	return 0;
+}
+
 
 int board_eth_init(bd_t *bis)
 {

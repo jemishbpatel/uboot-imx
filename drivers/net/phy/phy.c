@@ -758,7 +758,7 @@ static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
 	}
 	debug("not found\n");
 
-	return NULL;
+	return phy_device_create(bus, ffs(phy_mask) - 1, 0xffffffff, interface);
 }
 
 /**
@@ -820,7 +820,8 @@ int phy_reset(struct phy_device *phydev)
 	}
 
 	if (reg & BMCR_RESET) {
-		puts("PHY reset timed out\n");
+		//LiveU: We don't have phy so following print is misleading!
+		//puts("PHY reset timed out\n");
 		return -1;
 	}
 
