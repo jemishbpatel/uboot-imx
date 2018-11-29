@@ -35,6 +35,13 @@ config BACKLIGHT_GPIO
 	  it understands the standard device tree
 	  (leds/backlight/gpio-backlight.txt)
 
+config PWMCNTL_BACKLIGHT
+	bool "Backlight support in liveu boards"
+	default n
+	help
+	  If you have LCD backlight in adjustable by PWM, say Y to enable
+	  this configuration.
+
 config VIDEO_BPP8
 	bool "Support 8-bit-per-pixel displays"
 	depends on DM_VIDEO

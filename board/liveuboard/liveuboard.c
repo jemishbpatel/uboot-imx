@@ -33,6 +33,9 @@
 #include <power/pmic.h>
 #include <power/pfuze100_pmic.h>
 #include <mv88e6176.h>
+#if defined(CONFIG_PWMCNTL_BACKLIGHT)
+#include <pwm.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -306,7 +309,9 @@ struct i2c_pads_info mx6q_i2c3_pad_info = {
 	}
 };
 
-static iomux_v3_cfg_t const fwadapt_7wvga_pads[] = {
+
+#if defined(CONFIG_VIDEO_IPUV3)
+static iomux_v3_cfg_t const lcd_display_pads[] = {
 	IOMUX_PADS(PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK),
 	IOMUX_PADS(PAD_DI0_PIN2__IPU1_DI0_PIN02), /* HSync */
 	IOMUX_PADS(PAD_DI0_PIN3__IPU1_DI0_PIN03), /* VSync */
@@ -330,8 +335,18 @@ static iomux_v3_cfg_t const fwadapt_7wvga_pads[] = {
 	IOMUX_PADS(PAD_DISP0_DAT15__IPU1_DISP0_DATA15),
 	IOMUX_PADS(PAD_DISP0_DAT16__IPU1_DISP0_DATA16),
 	IOMUX_PADS(PAD_DISP0_DAT17__IPU1_DISP0_DATA17),
-	IOMUX_PADS(PAD_SD4_DAT2__GPIO2_IO10 | MUX_PAD_CTRL(NO_PAD_CTRL)), /* DISP0_BKLEN */
-	IOMUX_PADS(PAD_SD4_DAT3__GPIO2_IO11 | MUX_PAD_CTRL(NO_PAD_CTRL)), /* DISP0_VDDEN */
+	IOMUX_PADS(PAD_DISP0_DAT18__IPU1_DISP0_DATA18),
+	IOMUX_PADS(PAD_DISP0_DAT19__IPU1_DISP0_DATA19),
+	IOMUX_PADS(PAD_DISP0_DAT20__IPU1_DISP0_DATA20),
+	IOMUX_PADS(PAD_DISP0_DAT21__IPU1_DISP0_DATA21),
+	IOMUX_PADS(PAD_DISP0_DAT22__IPU1_DISP0_DATA22),
+	IOMUX_PADS(PAD_DISP0_DAT23__IPU1_DISP0_DATA23),
+	IOMUX_PADS(PAD_SD1_CMD__GPIO1_IO18 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+#if defined(CONFIG_PWMCNTL_BACKLIGHT)
+	IOMUX_PADS(PAD_SD1_DAT1__PWM3_OUT | MUX_PAD_CTRL(NO_PAD_CTRL)),   /* LCDCNTL */
+#else
+	IOMUX_PADS(PAD_SD1_DAT1__GPIO1_IO17 | MUX_PAD_CTRL(NO_PAD_CTRL)), /* LCDCNTL */
+#endif
 };
 
 static void do_enable_hdmi(struct display_info_t const *dev)
@@ -341,16 +356,22 @@ static void do_enable_hdmi(struct display_info_t const *dev)
 
 static int detect_i2c(struct display_info_t const *dev)
 {
-	return (0 == i2c_set_bus_num(dev->bus)) &&
-			(0 == i2c_probe(dev->addr));
+	/* Always return as detected to make it simple and
+	   to keep the existing logic as modular for future purpose */
+	return 1;
 }
 
-static void enable_fwadapt_7wvga(struct display_info_t const *dev)
+static void enable_tianma_5wvga(struct display_info_t const *dev)
 {
-	SETUP_IOMUX_PADS(fwadapt_7wvga_pads);
+	SETUP_IOMUX_PADS(lcd_display_pads);
+#if defined(CONFIG_PWMCNTL_BACKLIGHT)
+	gpio_direction_output(IMX_GPIO_NR(1, 18), 1);
+#else
+	/* Backlight : GPIO1_IO18 & GPIO1_IO18 */
+	gpio_direction_output(IMX_GPIO_NR(1, 18), 1);
+	gpio_direction_output(IMX_GPIO_NR(1, 17), 1);
+#endif
 
-	gpio_direction_output(IMX_GPIO_NR(2, 10), 1);
-	gpio_direction_output(IMX_GPIO_NR(2, 11), 1);
 }
 
 struct display_info_t const displays[] = {{
@@ -374,29 +395,36 @@ struct display_info_t const displays[] = {{
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
 } }, {
+	/* I2C bus number (I2C2) at which CTP is connected */
 	.bus	= 1,
-	.addr	= 0x10,
-	.pixfmt	= IPU_PIX_FMT_RGB666,
+	/* I2C slave address of CTP, it could be 0x48/0x49/0x4a/0x4b */
+	.addr	= 0x48,
+	/* LCD display pixel format RGB888 24-bit */
+	.pixfmt	= IPU_PIX_FMT_RGB24,
 	.detect	= detect_i2c,
-	.enable	= enable_fwadapt_7wvga,
+	.enable	= enable_tianma_5wvga,
+	/* Timings inserted based on
+		1) Table 5.2.2 on Page# 10 of EVK module,
+		2) Kernel file "Documentation/fb/framebuffer.txt" and
+		3) From https://community.freescale.com/docs/DOC-93617
+	*/
 	.mode	= {
-		.name           = "FWBADAPT-LCD-F07A-0102",
+		.name           = "TM050RVHG01-00",
 		.refresh        = 60,
 		.xres           = 800,
 		.yres           = 480,
-		.pixclock       = 33260,
-		.left_margin    = 128,
-		.right_margin   = 128,
-		.upper_margin   = 22,
-		.lower_margin   = 22,
-		.hsync_len      = 1,
-		.vsync_len      = 1,
+		.pixclock       = 33333,
+		.left_margin    = 48,
+		.right_margin   = 40,
+		.upper_margin   = 32,
+		.lower_margin   = 13,
+		.hsync_len      = 40,
+		.vsync_len      = 3,
 		.sync           = 0,
 		.vmode          = FB_VMODE_NONINTERLACED
 } } };
 size_t display_count = ARRAY_SIZE(displays);
 
-#if defined(CONFIG_VIDEO_IPUV3)
 static void setup_display(void)
 {
 	struct mxc_ccm_reg *mxc_ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
