@@ -610,7 +610,7 @@ KBUILD_CFLAGS += $(call cc-option,-fno-delete-null-pointer-checks)
 # change __FILE__ to the relative path from the srctree
 KBUILD_CFLAGS	+= $(call cc-option,-fmacro-prefix-map=$(srctree)/=)
 
-KBUILD_CFLAGS	+= -g
+KBUILD_CFLAGS	+= -g -mthumb -mcpu=cortex-a9 -mfpu=neon-fp16 -Ofast
 # $(KBUILD_AFLAGS) sets -g, which causes gcc to pass a suitable -g<format>
 # option to the assembler.
 KBUILD_AFLAGS	+= -g
