@@ -57,6 +57,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SPI_PAD_CTRL (PAD_CTL_HYS | PAD_CTL_SPEED_MED | \
 	PAD_CTL_DSE_40ohm	| PAD_CTL_SRE_FAST)
 
+#define UART_BUFFER_CONTROL	IMX_GPIO_NR(1, 6)
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
@@ -81,6 +82,7 @@ int dram_init(void)
 static iomux_v3_cfg_t const uart1_pads[] = {
 	IOMUX_PADS(PAD_CSI0_DAT10__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
 	IOMUX_PADS(PAD_CSI0_DAT11__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
+	IOMUX_PADS(PAD_GPIO_6__GPIO1_IO06   	 | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
 static iomux_v3_cfg_t const usdhc3_pads[] = {
@@ -570,6 +572,35 @@ int board_late_init(void)
 	return 0;
 }
 
+/* HW Team changed EEPROM slave address to 0x55, due to conflict with HDMI slave */
+#define EEPROM_SLAVE_ADDRESS (0x55)
+static int detect_i2c_eeprom(void)
+{
+	return (0 == i2c_set_bus_num(2)) &&
+			(0 == i2c_probe(EEPROM_SLAVE_ADDRESS));
+}
+
+static void configure_uart_normal(void)
+{
+	gpio_direction_output(UART_BUFFER_CONTROL, 0);
+	gpio_set_value(UART_BUFFER_CONTROL, 0);
+}
+
+static void configure_uart_crossed(void)
+{
+	gpio_direction_output(UART_BUFFER_CONTROL, 1);
+	gpio_set_value(UART_BUFFER_CONTROL, 1);
+}
+
+static void check_if_jig_is_connected_with_eeprom_on_i2c(void)
+{
+	/* Set to low as per HW team's input */
+	if (detect_i2c_eeprom())
+		configure_uart_crossed();
+	else
+		configure_uart_normal();
+}
+
 #if defined(CONFIG_CONFIGURE_FAN)
 #define FAN_CONTROLLER_SLAVE_ADDR_18		(0x18)
 int configure_fan(uchar i2c_bus_number, uchar chipAddr)
@@ -620,6 +651,7 @@ int configure_fan(uchar i2c_bus_number, uchar chipAddr)
 
 int misc_init_r(void)
 {
+	check_if_jig_is_connected_with_eeprom_on_i2c();
 #ifdef CONFIG_CONFIGURE_FAN
 	configure_fan(SET_I2C_BUS(0), FAN_CONTROLLER_SLAVE_ADDR_18);
 #endif
