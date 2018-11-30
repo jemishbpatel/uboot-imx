@@ -184,6 +184,13 @@ int board_mmc_getcd(struct mmc *mmc)
 	case USDHC3_BASE_ADDR:
 		ret = !gpio_get_value(USDHC3_CD_GPIO);
 		break;
+	case USDHC4_BASE_ADDR:
+		/* LiveU: Added to detect eMMC as like SD card.
+		   We don't have GPIO for card detection but mmc drivers in u-boot
+		   needs it to acess all the read/write APIs
+		*/
+		ret = 1;
+		break;
 	}
 
 	return ret;

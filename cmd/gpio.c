@@ -149,7 +149,20 @@ static int do_gpio(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #elif defined(CONFIG_DM_GPIO)
 		return cmd_process_error(cmdtp, do_gpio_status(all, str_gpio));
 #else
-		goto show_usage;
+		gpio = name_to_gpio(str_gpio);
+		if (gpio < 0)
+			goto show_usage;
+
+		/* grab the pin before we tweak it */
+		ret = gpio_request(gpio, "cmd_gpio");
+		if (ret && ret != -EBUSY) {
+			printf("gpio: requesting pin %u failed\n", gpio);
+			return -1;
+		}
+		value = gpio_get_value(gpio);
+		printf("gpio: pin %s (gpio %i) value is %u\n",
+				str_gpio, gpio, value);
+		return 0;
 #endif
 	}
 
