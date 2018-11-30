@@ -988,6 +988,12 @@ config CMD_SPI
 	help
 	  SPI utility command.
 
+config CMD_SPIEEPROM
+	bool "spi eeprom for liveuboards"
+	depends on MXC_SPI
+	help
+	   Enable this option to support spi read/write functionality.
+
 config CMD_TSI148
 	bool "tsi148 - Command to access tsi148 device"
 	help

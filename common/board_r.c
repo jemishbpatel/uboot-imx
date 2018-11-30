@@ -837,6 +837,9 @@ static init_fnc_t init_sequence_r[] = {
 	 * keyboard).
 	 */
 	last_stage_init,
+#ifdef CONFIG_MXC_SPI
+	setup_mac_addresses,
+#endif
 #endif
 #ifdef CONFIG_CMD_BEDBUG
 	INIT_FUNC_WATCHDOG_RESET

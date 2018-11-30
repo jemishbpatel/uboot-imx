@@ -8,6 +8,7 @@
  * This is file is created based "board/wandboard/wandboard.c"
  */
 
+#include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/crm_regs.h>
 #include <asm/arch/iomux.h>
@@ -36,6 +37,7 @@
 #if defined(CONFIG_PWMCNTL_BACKLIGHT)
 #include <pwm.h>
 #endif
+#include <spi_eeprom.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -61,8 +63,20 @@ DECLARE_GLOBAL_DATA_PTR;
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
+#define GPIO_BOOT_POR_EN	IMX_GPIO_NR(7, 13)
 
-#define I2C_BUS_0		0
+#define CCM_CCGR_1		(0x20c406c)
+#define ECSPI2_CLK_ENABLE	(0xC)
+#define ECSPI2_CLK_DISABLE	(0xfffffff3)
+#define ETHERNET_MAC_OFFSET	(19)
+#define USBETHERNET_MAC_OFFSET	(25)
+#define MAC_ADDRESS_SIZE	(6)
+#define MAX_BUFFER_SIZE		(50)
+#define MAX_CMDLINE_SIZE	(300)
+#define USBETHADDR_ENV_SIZE	(22)
+#define FEC_ADDR_LOW		(0x21880E4) /* Low 32bits MAC address */
+#define FEC_ADDR_HIGH		(0x21880E8) /* High 16bits MAC address */
+#define I2C_BUS_0		(0)
 #define SET_I2C_BUS(x)		I2C_BUS_##x
 /* Enabled Marvell switch MV88E6176 u-boot post command and
    SMI device address generated using ADDR[4:1] pull up pin
@@ -237,7 +251,158 @@ int board_mmc_init(bd_t *bis)
 	return 0;
 }
 
+void update_uboot_env_in_bootargs(const char *env_variable, const char *env_value)
+{
+	char buffer[MAX_BUFFER_SIZE] = {0};
+	char cmdline_args[MAX_CMDLINE_SIZE];
+	const char  *env = env_get("bootargs");
+
+	if (!env_variable || !*env_variable || !env_value) {
+		printf("Invalid Arguments in %s!\n", __func__);
+		return;
+	}
+
+	if (!env) {
+		printf("bootargs not defined!\n");
+		return;
+	}
+
+	strcpy(cmdline_args, env);
+	sprintf(buffer," %s=", env_variable);
+	char *cmdline_env_variable = strstr(cmdline_args, buffer);
+
+	if (cmdline_env_variable) {
+		char cmdline_env_value_for_strtok_input[MAX_CMDLINE_SIZE];
+		char *cmdline_env_value = strstr(cmdline_env_variable, "=");
+		++cmdline_env_value;
+		strcpy(cmdline_env_value_for_strtok_input, cmdline_env_value);
+
+		char *env_value_saved = strtok(cmdline_env_value_for_strtok_input, " ");
+
+		if (!strcmp(env_value_saved, env_value))
+			return;
+
+		char *cmdline_remaining_env = strtok(NULL, "\0");
+		strcpy(cmdline_env_value, env_value);
+		strcat(cmdline_env_value, " ");
+		strcat(cmdline_env_value, cmdline_remaining_env);
+	} else {
+		strcat(buffer, env_value);
+		strcat(cmdline_args, buffer);
+	}
+
+	env_set("bootargs", cmdline_args);
+}
+
+int is_valid_mac_address(unsigned char *addr)
+{
+	if (is_zero_ethaddr(addr)) {
+		printf("mac address is all 0x00\n");
+		return -1;
+	} else if (is_broadcast_ethaddr(addr)) {
+		printf("mac address is all 0xff\n");
+		return -1;
+	} else if (is_multicast_ethaddr(&addr[5])) {
+		printf("mulitcast address!\n");
+		return -1;
+	}
+	else
+		return 0;
+}
+
 #ifdef CONFIG_MXC_SPI
+int setup_eth_mac_address(void)
+{
+	int ret = 0;
+	unsigned char mac_address[MAC_ADDRESS_SIZE];
+	unsigned int offset = ETHERNET_MAC_OFFSET;
+	char buffer[MAX_BUFFER_SIZE];
+	char *env;
+
+	env = env_get("eth0_mac_offset");
+	if (env != NULL) {
+		strict_strtoul(env, 10,(long unsigned int *) &offset);
+	}
+	else {
+		printf("Environment variable eth0_mac_offset is not set, reading from default offset\n");
+		offset = ETHERNET_MAC_OFFSET;
+	}
+	ret = read_eeprom(offset, mac_address, MAC_ADDRESS_SIZE);
+	if (ret) {
+		printf("Failed to read eth0 mac address\n");
+		return ret;
+	}
+	else {
+		if (!is_valid_mac_address(mac_address)) {
+			memset(buffer, 0x00, sizeof(buffer));
+			sprintf(buffer, "setenv ethaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
+					mac_address[5], mac_address[4], mac_address[3], mac_address[2], mac_address[1], mac_address[0]);
+			run_command(buffer, 0);
+			writel((mac_address[5] << 24) | ( mac_address[4] << 16) | (mac_address[3] << 8) | (mac_address[2]), FEC_ADDR_LOW);
+			writel((mac_address[1] << 24) | ( mac_address[0] << 16) | 0x8808, FEC_ADDR_HIGH);
+		}
+	}
+	return ret;
+}
+
+int setup_usbeth_mac_address(void)
+{
+	int ret = 0;
+	unsigned char mac_address[MAC_ADDRESS_SIZE];
+	unsigned int offset = ETHERNET_MAC_OFFSET;
+	char buffer[MAX_BUFFER_SIZE];
+	char env_value[MAX_BUFFER_SIZE];
+
+	char* env = env_get("eth1_mac_offset");
+	if (env) {
+		strict_strtoul(env, 10, (long unsigned int *)&offset);
+	}
+	else {
+		printf("Environment variable eth1_mac_offset is not set, reading from default offset\n");
+		offset = USBETHERNET_MAC_OFFSET;
+	}
+
+	ret = read_eeprom(offset, mac_address, MAC_ADDRESS_SIZE);
+	if (ret) {
+		printf("Failed to read eth1 mac address\n");
+		return ret;
+	} else {
+		if (!is_valid_mac_address(mac_address)) {
+			memset(buffer, 0x00, sizeof(buffer));
+			sprintf(buffer,
+				"setenv usbethaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
+				mac_address[5], mac_address[4], mac_address[3], mac_address[2], mac_address[1], mac_address[0]);
+
+			run_command(buffer, 0);
+
+			memset(env_value, 0x00, sizeof(env_value));
+			sprintf(env_value,"%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",
+				mac_address[5], mac_address[4], mac_address[3], mac_address[2], mac_address[1], mac_address[0]);
+			update_uboot_env_in_bootargs("usbethaddr", env_value);
+		}
+	}
+
+	return ret;
+}
+
+int setup_mac_addresses(void)
+{
+	int ret = 0;
+
+	ret = setup_eth_mac_address();
+	if (ret) {
+		printf("Failed to set eth0 mac address\n");
+		return ret;
+	}
+	ret = setup_usbeth_mac_address();
+	if (ret) {
+		printf("Failed to set eth1 mac address\n");
+		return ret;
+	}
+
+	return ret;
+}
+
 iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS0/CS0 */
 	IOMUX_PADS(PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL)),
@@ -252,12 +417,58 @@ iomux_v3_cfg_t const ecspi2_pads[] = {
 	IOMUX_PADS(PAD_EIM_CS1__ECSPI2_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_RW__GPIO2_IO26   | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_D26__GPIO3_IO26  | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_GPIO_18__GPIO7_IO13 | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
+
+void ecspi2_clock_enable(void)
+{
+	u32 ecspi_clk;
+
+	ecspi_clk = __raw_readl(CCM_CCGR_1);
+	ecspi_clk |= ECSPI2_CLK_ENABLE;
+	__raw_writel(ecspi_clk, CCM_CCGR_1);
+}
+
+void ecspi2_clock_disable(void)
+{
+	u32 ecspi_clk;
+
+	ecspi_clk = __raw_readl(CCM_CCGR_1);
+	ecspi_clk &= ECSPI2_CLK_DISABLE;
+	__raw_writel(ecspi_clk, CCM_CCGR_1);
+}
+
+void spi_clock_enable(void)
+{
+	ecspi2_clock_enable();
+}
+
+
+void spi_clock_disable(void)
+{
+	ecspi2_clock_disable();
+}
+
+void setup_clock_and_chipselect(void)
+{
+	spi_clock_enable();
+	gpio_request(ECSPI2_SPI_CHIPSELECT, "eeprom_cs");
+	gpio_direction_output(ECSPI2_SPI_CHIPSELECT, 0);
+	gpio_set_value(ECSPI2_SPI_CHIPSELECT, 0);
+
+	gpio_request(EEPROM_WRITE_PROTECT, "eeprom_wp");
+	gpio_direction_output(EEPROM_WRITE_PROTECT, 1);
+	gpio_set_value(EEPROM_WRITE_PROTECT, 1);
+
+	gpio_direction_output(GPIO_BOOT_POR_EN , 0);
+	gpio_set_value(GPIO_BOOT_POR_EN, 1);
+}
 
 void setup_spi(void)
 {
 	SETUP_IOMUX_PADS(ecspi1_pads);
 	SETUP_IOMUX_PADS(ecspi2_pads);
+	setup_clock_and_chipselect();
 }
 #endif
 

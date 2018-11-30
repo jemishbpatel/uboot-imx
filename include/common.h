@@ -351,6 +351,7 @@ void ft_pci_setup(void *blob, bd_t *bd);
 void smp_set_core_boot_addr(unsigned long addr, int corenr);
 void smp_kick_all_cpus(void);
 
+int setup_mac_addresses(void);
 /* $(CPU)/serial.c */
 int	serial_init   (void);
 void	serial_setbrg (void);
