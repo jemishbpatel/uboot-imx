@@ -60,6 +60,7 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_DSE_40ohm	| PAD_CTL_SRE_FAST)
 
 #define UART_BUFFER_CONTROL	IMX_GPIO_NR(1, 6)
+#define LCD_CAP_RST		IMX_GPIO_NR(1, 24)
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
@@ -92,6 +93,10 @@ int dram_init(void)
 
 	return 0;
 }
+
+static iomux_v3_cfg_t const gpio_pads[] = {
+	IOMUX_PADS(PAD_ENET_RX_ER__GPIO1_IO24 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+};
 
 static iomux_v3_cfg_t const uart1_pads[] = {
 	IOMUX_PADS(PAD_CSI0_DAT10__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
@@ -169,6 +174,11 @@ static struct mv88e6176_sw_reg switch_conf[] = {
 static iomux_v3_cfg_t const rev_detection_pad[] = {
 	IOMUX_PADS(PAD_EIM_EB0__GPIO2_IO28  | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
+
+static void setup_iomux_gpio(void)
+{
+	SETUP_IOMUX_PADS(gpio_pads);
+}
 
 static void setup_iomux_uart(void)
 {
@@ -595,26 +605,6 @@ static void enable_tianma_5wvga(struct display_info_t const *dev)
 }
 
 struct display_info_t const displays[] = {{
-	.bus	= -1,
-	.addr	= 0,
-	.pixfmt	= IPU_PIX_FMT_RGB24,
-	.detect	= detect_hdmi,
-	.enable	= do_enable_hdmi,
-	.mode	= {
-		.name           = "HDMI",
-		.refresh        = 60,
-		.xres           = 1024,
-		.yres           = 768,
-		.pixclock       = 15385,
-		.left_margin    = 220,
-		.right_margin   = 40,
-		.upper_margin   = 21,
-		.lower_margin   = 7,
-		.hsync_len      = 60,
-		.vsync_len      = 10,
-		.sync           = FB_SYNC_EXT,
-		.vmode          = FB_VMODE_NONINTERLACED
-} }, {
 	/* I2C bus number (I2C2) at which CTP is connected */
 	.bus	= 1,
 	/* I2C slave address of CTP, it could be 0x48/0x49/0x4a/0x4b */
@@ -642,7 +632,27 @@ struct display_info_t const displays[] = {{
 		.vsync_len      = 3,
 		.sync           = 0,
 		.vmode          = FB_VMODE_NONINTERLACED
-} } };
+} },{
+	.bus	= -1,
+	.addr	= 0,
+	.pixfmt	= IPU_PIX_FMT_RGB24,
+	.detect	= detect_hdmi,
+	.enable	= do_enable_hdmi,
+	.mode	= {
+		.name           = "HDMI",
+		.refresh        = 60,
+		.xres           = 1024,
+		.yres           = 768,
+		.pixclock       = 15385,
+		.left_margin    = 220,
+		.right_margin   = 40,
+		.upper_margin   = 21,
+		.lower_margin   = 7,
+		.hsync_len      = 60,
+		.vsync_len      = 10,
+		.sync           = FB_SYNC_EXT,
+		.vmode          = FB_VMODE_NONINTERLACED
+} },};
 size_t display_count = ARRAY_SIZE(displays);
 
 static void setup_display(void)
@@ -689,6 +699,7 @@ int board_eth_init(bd_t *bis)
 
 int board_early_init_f(void)
 {
+	setup_iomux_gpio();
 	setup_iomux_uart();
 #ifdef CONFIG_SATA
 	setup_sata();
@@ -869,6 +880,11 @@ int misc_init_r(void)
 	return 0;
 }
 
+static void bring_ctp_out_of_reset(void)
+{
+	gpio_direction_output(LCD_CAP_RST, 1);
+}
+
 int board_init(void)
 {
 	/* address of boot parameters */
@@ -877,6 +893,7 @@ int board_init(void)
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
+	bring_ctp_out_of_reset();
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c1_pad_info);
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c2_pad_info);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c3_pad_info);
