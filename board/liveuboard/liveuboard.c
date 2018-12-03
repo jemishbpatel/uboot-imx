@@ -63,6 +63,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define LCD_CAP_RST		IMX_GPIO_NR(1, 24)
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
+#define GPIO_WIFI_EN		IMX_GPIO_NR(3, 20)
+#define GPIO_WLAN_VOLATGE	IMX_GPIO_NR(3, 31)
 #define REV_DETECTION		IMX_GPIO_NR(2, 28)
 #define GPIO_BOOT_POR_EN	IMX_GPIO_NR(7, 13)
 
@@ -96,6 +98,10 @@ int dram_init(void)
 
 static iomux_v3_cfg_t const gpio_pads[] = {
 	IOMUX_PADS(PAD_ENET_RX_ER__GPIO1_IO24 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_EIM_D19__GPIO3_IO19    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_EIM_D20__GPIO3_IO20    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_EIM_D31__GPIO3_IO31    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_GPIO_19__GPIO4_IO05    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
 static iomux_v3_cfg_t const uart1_pads[] = {
@@ -706,6 +712,23 @@ int board_early_init_f(void)
 #endif
 
 	return 0;
+}
+
+
+static void configure_wl18xx_gpio(void)
+{
+	gpio_direction_output(GPIO_WLAN_VOLATGE , 0);
+	gpio_set_value(GPIO_WLAN_VOLATGE, 1);
+
+	gpio_direction_output(GPIO_WIFI_EN , 0);
+	gpio_set_value(GPIO_WIFI_EN, 1);
+}
+
+int setup_gpios(void)
+{
+	int ret = 0;
+	configure_wl18xx_gpio();
+	return ret;
 }
 
 #define PMIC_I2C_BUS		2

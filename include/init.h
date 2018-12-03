@@ -166,6 +166,7 @@ int arch_early_init_r(void);
 void pci_init(void);
 int misc_init_r(void);
 int setup_mac_addresses(void);
+int setup_gpios(void);
 #if defined(CONFIG_VID)
 int init_func_vid(void);
 #endif

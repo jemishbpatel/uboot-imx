@@ -837,6 +837,7 @@ static init_fnc_t init_sequence_r[] = {
 	 * keyboard).
 	 */
 	last_stage_init,
+	setup_gpios,
 #ifdef CONFIG_MXC_SPI
 	setup_mac_addresses,
 #endif
