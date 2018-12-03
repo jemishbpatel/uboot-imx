@@ -738,6 +738,126 @@ static void setup_display(void)
 }
 #endif /* CONFIG_VIDEO_IPUV3 */
 
+#define IOEXP1_SLAVE_ADDRESS	(0x21)
+#define IOEXP2_SLAVE_ADDRESS	(0x22)
+
+int configure_ioexpanders(void)
+{
+	uchar   chipAddr1 = IOEXP1_SLAVE_ADDRESS;
+	uchar   chipAddr2 = IOEXP2_SLAVE_ADDRESS;
+	uint   regAddr;
+	uchar   value, readback_value;
+
+	i2c_set_bus_num(0);
+
+	/* IO Expander (with slave address 0x21) default settings */
+	regAddr = 0x6; value = 0xff;
+	if (i2c_write(chipAddr1, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr1, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr1, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr1, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x7; value = 0xff;
+	if (i2c_write(chipAddr1, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr1, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr1, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr1, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x2; value = 0xff;
+	if (i2c_write(chipAddr1, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr1, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr1, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr1, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x3; value = 0xff;
+	if (i2c_write(chipAddr1, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr1, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr1, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr1, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	/* IO Expander (with slave address 0x22) default settings */
+	regAddr = 0x6; value = 0xe7;
+	if (i2c_write(chipAddr2, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr2, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr2, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr2, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x7; value = 0xff;
+	if (i2c_write(chipAddr2, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr2, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr2, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr2, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x2; value = 0xef;
+	if (i2c_write(chipAddr2, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr1, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr2, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr2, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+
+	regAddr = 0x3; value = 0x8b;
+	if (i2c_write(chipAddr2, regAddr, 1, &value, 1) != 0)
+		printf("Error writing the ioexpander 0x%x 0x%x register.\n",
+				chipAddr2, regAddr);
+	readback_value = 0;
+	if(i2c_read(chipAddr2, regAddr, 1, &readback_value, 1) != 0)
+		printf("Readback of the ioexpander 0x%x 0x%x register failed."
+				"Readback value = 0x%x\n", chipAddr2, regAddr, readback_value);
+
+	if(value != readback_value)
+		printf("Warning: Readback value (0x%x) is different from set value (0x%x)\n",
+				readback_value, value);
+	return 0;
+}
+
 int last_stage_init(void)
 {
 	/* configure MV88E6176 switch */
@@ -750,6 +870,8 @@ int last_stage_init(void)
 	ARRAY_SIZE(switch_conf));
 
 	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
+
+	configure_ioexpanders();
 	return 0;
 }
 
