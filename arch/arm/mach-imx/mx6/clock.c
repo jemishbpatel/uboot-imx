@@ -12,6 +12,8 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 
+#define DIVIDER_VALUE	(0x53)
+
 enum pll_clocks {
 	PLL_SYS,	/* System PLL */
 	PLL_BUS,	/* System Bus PLL*/
@@ -214,6 +216,13 @@ static u32 decode_pll(enum pll_clocks pll, u32 infreq)
 
 	switch (pll) {
 	case PLL_SYS:
+		/* LiveU boards imx6q SOC part number : MCIMX6Q6AVT10AD
+		   If a 24 MHz input clock is used , the maximum SOC speed
+		   is limited to 996 MHz (Page 3) */
+		div = __raw_readl(&imx_ccm->analog_pll_sys);
+		div &= ~BM_ANADIG_PLL_SYS_DIV_SELECT;
+		div |= DIVIDER_VALUE; /* 996 Mhz*/
+		 __raw_writel(div,&imx_ccm->analog_pll_sys);
 		div = __raw_readl(&imx_ccm->analog_pll_sys);
 		div &= BM_ANADIG_PLL_SYS_DIV_SELECT;
 
