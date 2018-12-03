@@ -65,7 +65,6 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define GPIO_WIFI_EN		IMX_GPIO_NR(3, 20)
 #define GPIO_WLAN_VOLATGE	IMX_GPIO_NR(3, 31)
-#define REV_DETECTION		IMX_GPIO_NR(2, 28)
 #define GPIO_BOOT_POR_EN	IMX_GPIO_NR(7, 13)
 
 #define CCM_CCGR_1		(0x20c406c)
@@ -88,8 +87,6 @@ DECLARE_GLOBAL_DATA_PTR;
 #define MV88E6176_ADDRESS		(0x1E)
 
 #define DEFAULT_BRIGHTNESS_LEVEL	(20)
-
-static bool with_pmic;
 
 int dram_init(void)
 {
@@ -177,10 +174,6 @@ static struct mv88e6176_sw_reg switch_conf[] = {
 	{ PHY(2), PHY_CTRL, PHY_100_MBPS | AUTONEG_EN | FULL_DUPLEX | PHY_RESET | 0x200 },
 	{ PHY(0), PHY_1000_CTRL, 0x0E00 },
 	{ GLOBAL2, SCRATCH_MISC, (GP_PIN_CTRL3 << 8) | CLK_125MHZ | DATA_UPDATE }
-};
-
-static iomux_v3_cfg_t const rev_detection_pad[] = {
-	IOMUX_PADS(PAD_EIM_EB0__GPIO2_IO28  | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
 static void setup_iomux_gpio(void)
@@ -796,31 +789,6 @@ int setup_gpios(void)
 	return ret;
 }
 
-#define PMIC_I2C_BUS		2
-
-int power_init_board(void)
-{
-	struct pmic *p;
-	u32 reg;
-
-	/* configure PFUZE100 PMIC */
-	power_pfuze100_init(PMIC_I2C_BUS);
-	p = pmic_get("PFUZE100");
-	if (p && !pmic_probe(p)) {
-		pmic_reg_read(p, PFUZE100_DEVICEID, &reg);
-		printf("PMIC:  PFUZE100 ID=0x%02x\n", reg);
-		with_pmic = true;
-
-		/* Set VGEN2 to 1.5V and enable */
-		pmic_reg_read(p, PFUZE100_VGEN2VOL, &reg);
-		reg &= ~(LDO_VOL_MASK);
-		reg |= (LDOA_1_50V | (1 << (LDO_EN)));
-		pmic_reg_write(p, PFUZE100_VGEN2VOL, reg);
-	}
-
-	return 0;
-}
-
 /*
  * Do not overwrite the console
  * Use always serial for U-Boot console
@@ -839,25 +807,6 @@ static const struct boot_mode board_boot_modes[] = {
 };
 #endif
 
-static bool is_revc1(void)
-{
-	SETUP_IOMUX_PADS(rev_detection_pad);
-	gpio_direction_input(REV_DETECTION);
-
-	if (gpio_get_value(REV_DETECTION))
-		return true;
-	else
-		return false;
-}
-
-static bool is_revd1(void)
-{
-	if (with_pmic)
-		return true;
-	else
-		return false;
-}
-
 int board_late_init(void)
 {
 #ifdef CONFIG_CMD_BMODE
@@ -871,13 +820,6 @@ int board_late_init(void)
 		env_set("board_rev", "MX6Q");
 	else
 		env_set("board_rev", "MX6DL");
-
-	if (is_revd1())
-		env_set("board_name", "D1");
-	else if (is_revc1())
-		env_set("board_name", "C1");
-	else
-		env_set("board_name", "B1");
 #endif
 	return 0;
 }
@@ -994,12 +936,5 @@ int board_init(void)
 
 int checkboard(void)
 {
-	if (is_revd1())
-		puts("Board: Liveuboard rev D1\n");
-	else if (is_revc1())
-		puts("Board: Liveuboard rev C1\n");
-	else
-		puts("Board: Liveuboard rev B1\n");
-
 	return 0;
 }
