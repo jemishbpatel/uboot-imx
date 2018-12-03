@@ -85,7 +85,9 @@ DECLARE_GLOBAL_DATA_PTR;
    SMI device address generated using ADDR[4:1] pull up pin
    configuration of marvell switch
 */
-#define MV88E6176_ADDRESS	0x1E
+#define MV88E6176_ADDRESS		(0x1E)
+
+#define DEFAULT_BRIGHTNESS_LEVEL	(20)
 
 static bool with_pmic;
 
@@ -545,6 +547,69 @@ struct i2c_pads_info mx6q_i2c3_pad_info = {
 	}
 };
 
+#if defined(CONFIG_PWMCNTL_BACKLIGHT)
+void add_parameter_brightness(int brightness)
+{
+	char buffer[MAX_BUFFER_SIZE];
+	char env_value[MAX_BUFFER_SIZE];
+
+	if (brightness < BRIGHTNESS_LEVEL_MIN || brightness > BRIGHTNESS_LEVEL_MAX)
+		return;
+
+	memset(buffer, 0x00, sizeof(buffer));
+	sprintf(buffer, "setenv brightness %.2d", brightness);
+	run_command(buffer, 0);
+
+	memset(env_value, 0x00, sizeof(env_value));
+	sprintf(env_value,"%.2d", brightness);
+	update_uboot_env_in_bootargs("brightness", env_value);
+}
+
+unsigned int get_brightess(void)
+{
+	unsigned int brightness = DEFAULT_BRIGHTNESS_LEVEL;
+	char* env = env_get("brightness");
+
+	if (env)
+		strict_strtoul(env, 10, (long unsigned int *)&brightness);
+
+	return brightness;
+}
+
+int map_brightness_level_to_dutycycle_percentage(unsigned int brightness)
+{
+	return (MINIMUM_DUTYCYCLE_PERCENTAGE + (brightness * STEP_SIZE));
+}
+
+unsigned int compute_dutycycle(int pwm, unsigned int brightness, unsigned int period)
+{
+	int dutycycle_percentage;
+	if ((brightness < BRIGHTNESS_LEVEL_MIN) || (brightness > BRIGHTNESS_LEVEL_MAX))
+		return period;
+	else {
+		dutycycle_percentage = map_brightness_level_to_dutycycle_percentage(brightness);
+		return ((period * dutycycle_percentage)/100);
+	}
+}
+
+int enable_backlight(void)
+{
+	unsigned int dutycycle = CLOCK_CYCLE_PERIOD;
+	unsigned int brightness = DEFAULT_BRIGHTNESS_LEVEL;
+
+	/* Initialize PWM 3 */
+	if (pwm_init(PWM3, 0, 0))
+		puts("error init pwm for backlight\n");
+	brightness = get_brightess();
+	dutycycle = compute_dutycycle(PWM3, brightness, CLOCK_CYCLE_PERIOD);
+	if (pwm_config(PWM3, dutycycle, CLOCK_CYCLE_PERIOD))
+		puts("error config pwm for backlight\n");
+	if (pwm_enable(PWM3))
+		puts("error enable pwm for backlight\n");
+	add_parameter_brightness(brightness);
+	return 0;
+}
+#endif
 
 #if defined(CONFIG_VIDEO_IPUV3)
 static iomux_v3_cfg_t const lcd_display_pads[] = {

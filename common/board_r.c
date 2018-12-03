@@ -788,6 +788,9 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_MISC_INIT_R
 	misc_init_r,		/* miscellaneous platform-dependent init */
 #endif
+#ifdef CONFIG_PWMCNTL_BACKLIGHT
+	enable_backlight,
+#endif
 	INIT_FUNC_WATCHDOG_RESET
 #ifdef CONFIG_CMD_KGDB
 	initr_kgdb,

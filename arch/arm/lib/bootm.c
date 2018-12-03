@@ -26,11 +26,14 @@
 #include <linux/compiler.h>
 #include <bootm.h>
 #include <vxworks.h>
+#include <asm/gpio.h>
 
 #ifdef CONFIG_ARMV7_NONSEC
 #include <asm/armv7.h>
 #endif
 #include <asm/setup.h>
+
+#define GPIO_LCD_ON_OFF		(18)
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -88,6 +91,8 @@ static void announce_and_cleanup(int fake)
 {
 	printf("\nStarting kernel ...%s\n\n", fake ?
 		"(fake run for tracing)" : "");
+	/* Turn off LCD to avoid white screen flash */
+	gpio_set_value(GPIO_LCD_ON_OFF, 0);
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 #ifdef CONFIG_BOOTSTAGE_FDT
 	bootstage_fdt_add_report();

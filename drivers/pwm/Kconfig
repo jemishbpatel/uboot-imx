@@ -50,3 +50,8 @@ config PWM_SUNXI
 	help
 	  This PWM is found on H3, A64 and other Allwinner SoCs. It supports a
 	  programmable period and duty cycle. A 16-bit counter is used.
+
+config PWM_IMX
+	bool "Enable support for IMX chips PWM"
+	help
+	  Enable this option to enable backlight PWM support of IMX boards.

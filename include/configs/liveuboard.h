@@ -58,6 +58,7 @@
 #define CONFIG_ETHPRIME			"FEC"
 #define CONFIG_FEC_MXC_PHYADDR		1
 
+#define CONFIG_IMX6_PWM_PER_CLK		66000000
 /* Framebuffer */
 #ifdef CONFIG_VIDEO
 #define CONFIG_VIDEO_BMP_RLE8

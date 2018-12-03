@@ -10,6 +10,13 @@
 #ifndef _pwm_h_
 #define _pwm_h_
 
+#define CLOCK_CYCLE_PERIOD		(25000)
+#define PWM3				(2)
+#define PWM4				(3)
+
+#define MINIMUM_DUTYCYCLE_PERCENTAGE	(80)
+#define STEP_SIZE			(1)
+
 /* struct pwm_ops: Operations for the PWM uclass */
 struct pwm_ops {
 	/**
@@ -85,5 +92,10 @@ int	pwm_config		(int pwm_id, int duty_ns, int period_ns);
 int	pwm_enable		(int pwm_id);
 void	pwm_disable		(int pwm_id);
 #endif
+
+typedef enum _brightness_level {
+	BRIGHTNESS_LEVEL_MIN,
+	BRIGHTNESS_LEVEL_MAX = 20
+}brightness_level;
 
 #endif /* _pwm_h_ */
