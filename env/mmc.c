@@ -17,6 +17,7 @@
 #include <part.h>
 #include <search.h>
 #include <errno.h>
+#include <asm/io.h>
 
 #define __STR(X) #X
 #define STR(X) __STR(X)
@@ -110,9 +111,20 @@ static inline s64 mmc_offset(int copy)
 }
 #endif
 
+static int get_device_num(void)
+{
+#ifdef CONFIG_SPL_BUILD
+	return 0;
+#else
+	const u32 BOOT_MODE_REG = 0x20d8004;
+
+	return (readl(BOOT_MODE_REG) & 0x20)? 1 : 0;
+#endif
+}
+
 __weak int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr)
 {
-	s64 offset = mmc_offset(copy);
+	s64 offset = get_device_num() ? (4 * 64 * 1024) : (4 * 250 * 1024);
 
 	if (offset < 0)
 		offset += mmc->capacity;
@@ -124,7 +136,7 @@ __weak int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr)
 
 __weak int mmc_get_env_dev(void)
 {
-	return CONFIG_SYS_MMC_ENV_DEV;
+	return get_device_num();
 }
 
 #ifdef CONFIG_SYS_MMC_ENV_PART
@@ -138,7 +150,7 @@ static unsigned char env_mmc_orig_hwpart;
 static int mmc_set_env_part(struct mmc *mmc)
 {
 	uint part = mmc_get_env_part(mmc);
-	int dev = mmc_get_env_dev();
+	int dev = get_device_num();
 	int ret = 0;
 
 	env_mmc_orig_hwpart = mmc_get_blk_desc(mmc)->hwpart;
@@ -175,7 +187,7 @@ static const char *init_mmc_for_env(struct mmc *mmc)
 static void fini_mmc_for_env(struct mmc *mmc)
 {
 #ifdef CONFIG_SYS_MMC_ENV_PART
-	int dev = mmc_get_env_dev();
+	int dev = get_device_num();
 
 	blk_select_hwpart_devnum(IF_TYPE_MMC, dev, env_mmc_orig_hwpart);
 #endif
@@ -199,7 +211,7 @@ static inline int write_env(struct mmc *mmc, unsigned long size,
 static int env_mmc_save(void)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(env_t, env_new, 1);
-	int dev = mmc_get_env_dev();
+	int dev = get_device_num();
 	struct mmc *mmc = find_mmc_device(dev);
 	u32	offset;
 	int	ret, copy = 0;
@@ -266,7 +278,7 @@ static int env_mmc_load(void)
 	u32 offset1, offset2;
 	int read1_fail = 0, read2_fail = 0;
 	int ret;
-	int dev = mmc_get_env_dev();
+	int dev = get_device_num();
 	const char *errmsg = NULL;
 
 	ALLOC_CACHE_ALIGN_BUFFER(env_t, tmp_env1, 1);
@@ -311,7 +323,7 @@ static int env_mmc_load(void)
 	struct mmc *mmc;
 	u32 offset;
 	int ret;
-	int dev = mmc_get_env_dev();
+	int dev = get_device_num();
 	const char *errmsg;
 
 	mmc = find_mmc_device(dev);
