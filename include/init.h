@@ -168,6 +168,7 @@ int misc_init_r(void);
 int setup_mac_addresses(void);
 int setup_gpios(void);
 int enable_backlight(void);
+int get_hardware_revision(void);
 #if defined(CONFIG_VID)
 int init_func_vid(void);
 #endif

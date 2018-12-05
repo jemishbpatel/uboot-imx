@@ -87,6 +87,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define MV88E6176_ADDRESS		(0x1E)
 
 #define DEFAULT_BRIGHTNESS_LEVEL	(20)
+#define CORECARD_REVISION_OFFSET	(50)
+#define LU600_BOARD_DEFAULT_HARDWARE_REVISION	('B')
 
 int dram_init(void)
 {
@@ -784,6 +786,35 @@ static void setup_display(void)
 	gpio_direction_input(IMX_GPIO_NR(4, 20));
 }
 #endif /* CONFIG_VIDEO_IPUV3 */
+
+void get_corecard_revision(unsigned char *hardware_revision)
+{
+	unsigned int offset = CORECARD_REVISION_OFFSET;
+	if( read_eeprom(offset, hardware_revision, 1) ) {
+		printf("Warning: failed read corecard revision info, setting 'B' as default\n");
+		*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+	}
+	/* if reading EEPROM doesn't have value in between 'E' to 'Z' */
+	if( !((*hardware_revision >= 'E') && (*hardware_revision <= 'Z')) )
+		*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+}
+
+int get_hardware_revision(void)
+{
+	char buffer[MAX_BUFFER_SIZE];
+	char env_value[MAX_BUFFER_SIZE];
+	unsigned char corecard_hardware_revision;
+
+	get_corecard_revision(&corecard_hardware_revision);
+	memset(buffer, 0x00, sizeof(buffer));
+	sprintf(buffer, "setenv hwrev %c", corecard_hardware_revision);
+	run_command(buffer, 0);
+
+	memset(env_value, 0x00, sizeof(env_value));
+	sprintf(env_value,"%c", corecard_hardware_revision);
+	update_uboot_env_in_bootargs("hwrev", env_value);
+	return 0;
+}
 
 #define IOEXP1_SLAVE_ADDRESS	(0x21)
 #define IOEXP2_SLAVE_ADDRESS	(0x22)

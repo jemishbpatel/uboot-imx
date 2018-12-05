@@ -843,6 +843,7 @@ static init_fnc_t init_sequence_r[] = {
 	setup_gpios,
 #ifdef CONFIG_MXC_SPI
 	setup_mac_addresses,
+	get_hardware_revision,
 #endif
 #endif
 #ifdef CONFIG_CMD_BEDBUG
