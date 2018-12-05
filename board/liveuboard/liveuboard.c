@@ -176,6 +176,53 @@ static struct mv88e6176_sw_reg switch_conf[] = {
 	{ GLOBAL2, SCRATCH_MISC, (GP_PIN_CTRL3 << 8) | CLK_125MHZ | DATA_UPDATE }
 };
 
+/* Marvell MV88E6176 switch VLAN configuration */
+static struct mv88e6176_sw_reg switch_vlan_conf[] = {
+	/* Clear VLAN ID Table */
+	{ GLOBAL1, VTU_OPS, VTU_BUSY_BIT | VTU_FLUSH_ALL},
+
+	/* Create VLAN 1 */
+	/* Load VTU Entry */
+	{ GLOBAL1, VTU_FID, 0x0},
+	{ GLOBAL1, VTU_SID, 0x0},
+	{ GLOBAL1, VSTU_DATA_P0TO3, 0x3300},
+	{ GLOBAL1, VSTU_DATA_P4TO6, 0x0003},
+	{ GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_1_ID},
+	{ GLOBAL1, VTU_OPS, VTU_BUSY_BIT | VTU_LOAD_ENTRY},
+	/* Load STU Entry */
+	{ GLOBAL1, VTU_FID, 0x0},
+	{ GLOBAL1, VTU_SID, 0x0},
+	{ GLOBAL1, VSTU_DATA_P0TO3, 0xCCCC},
+	{ GLOBAL1, VSTU_DATA_P4TO6, 0x0CCC},
+	{ GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_1_ID},
+	{ GLOBAL1, VTU_OPS, VTU_BUSY_BIT | STU_LOAD_ENTRY},
+
+	/* Create VLAN 5 */
+	/* Load VTU Entry */
+	{ GLOBAL1, VTU_FID, 0x0},
+	{ GLOBAL1, VTU_SID, 0x0},
+	{ GLOBAL1, VSTU_DATA_P0TO3, 0x3333},
+	{ GLOBAL1, VSTU_DATA_P4TO6, 0x0003},
+	{ GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_5_ID},
+	{ GLOBAL1, VTU_OPS, VTU_BUSY_BIT | VTU_LOAD_ENTRY},
+	/* Load STU Entry */
+	{ GLOBAL1, VTU_FID, 0x0},
+	{ GLOBAL1, VTU_SID, 0x0},
+	{ GLOBAL1, VSTU_DATA_P0TO3, 0xCCCC},
+	{ GLOBAL1, VSTU_DATA_P4TO6, 0x0CCC},
+	{ GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_5_ID},
+	{ GLOBAL1, VTU_OPS, VTU_BUSY_BIT | STU_LOAD_ENTRY},
+
+	/* Enable IEEE 802.1Q VLAN on PORT */
+	{ PORT(0), PORT_CONTROL2, 0x2c80},
+	{ PORT(1), PORT_CONTROL2, 0x2c80},
+	{ PORT(2), PORT_CONTROL2, 0x2c80},
+	{ PORT(3), PORT_CONTROL2, 0x2c80},
+	{ PORT(4), PORT_CONTROL2, 0x2c80},
+	{ PORT(5), PORT_CONTROL2, 0x2c80},
+	{ PORT(6), PORT_CONTROL2, 0x2c80}
+};
+
 static void setup_iomux_gpio(void)
 {
 	SETUP_IOMUX_PADS(gpio_pads);
@@ -868,6 +915,9 @@ int last_stage_init(void)
 
 	mv88e6176_sw_program(name, MV88E6176_ADDRESS, switch_conf,
 	ARRAY_SIZE(switch_conf));
+
+	mv88e6176_sw_program(name, MV88E6176_ADDRESS, switch_vlan_conf,
+			ARRAY_SIZE(switch_vlan_conf));
 
 	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
 
