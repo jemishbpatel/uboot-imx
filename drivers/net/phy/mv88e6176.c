@@ -239,7 +239,7 @@ int do_mvsw_reg_dumpall(const char *name, int argc, char * const argv[])
 	u16 value = 0, phyaddr, reg, port;
 	int ret;
 
-	phyaddr = simple_strtoul(argv[1], NULL, 10);
+	phyaddr = simple_strtoul(argv[1], NULL, 16);
 
 	/* first we need to disable the PPU */
 	ret = ppu_disable(name, phyaddr);
@@ -310,9 +310,9 @@ int do_mvsw_reg_dump(const char *name, int argc, char * const argv[])
 	u16 value = 0, phyaddr, reg, port, count;
 	int ret;
 
-	phyaddr = simple_strtoul(argv[1], NULL, 10);
-	port = simple_strtoul(argv[2], NULL, 10);
-	count = simple_strtoul(argv[3], NULL, 10);
+	phyaddr = simple_strtoul(argv[1], NULL, 16);
+	port = simple_strtoul(argv[2], NULL, 16);
+	count = simple_strtoul(argv[3], NULL, 16);
 
 	/* first we need to disable the PPU */
 	ret = ppu_disable(name, phyaddr);
@@ -353,9 +353,9 @@ int do_mvsw_reg_read(const char *name, int argc, char * const argv[])
 	u16 value = 0, phyaddr, reg, port;
 	int ret;
 
-	phyaddr = simple_strtoul(argv[1], NULL, 10);
-	port = simple_strtoul(argv[2], NULL, 10);
-	reg = simple_strtoul(argv[3], NULL, 10);
+	phyaddr = simple_strtoul(argv[1], NULL, 16);
+	port = simple_strtoul(argv[2], NULL, 16);
+	reg = simple_strtoul(argv[3], NULL, 16);
 
 	/* first we need to disable the PPU */
 	ret = ppu_disable(name, phyaddr);
@@ -388,9 +388,9 @@ int do_mvsw_reg_write(const char *name, int argc, char * const argv[])
 	u16 value = 0, phyaddr, reg, port;
 	int ret;
 
-	phyaddr = simple_strtoul(argv[1], NULL, 10);
-	port = simple_strtoul(argv[2], NULL, 10);
-	reg = simple_strtoul(argv[3], NULL, 10);
+	phyaddr = simple_strtoul(argv[1], NULL, 16);
+	port = simple_strtoul(argv[2], NULL, 16);
+	reg = simple_strtoul(argv[3], NULL, 16);
 	value = simple_strtoul(argv[4], NULL, 16);
 
 	/* first we need to disable the PPU */

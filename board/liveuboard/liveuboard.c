@@ -239,11 +239,9 @@ static void setup_iomux_enet(void)
 {
 	SETUP_IOMUX_PADS(enet_pads);
 
-	/* Reset AR8031 PHY */
 	gpio_direction_output(ETH_PHY_RESET, 0);
-	mdelay(10);
+	udelay(500);
 	gpio_set_value(ETH_PHY_RESET, 1);
-	udelay(100);
 }
 
 static struct fsl_esdhc_cfg usdhc_cfg[2] = {
@@ -968,9 +966,6 @@ int board_early_init_f(void)
 {
 	setup_iomux_gpio();
 	setup_iomux_uart();
-#ifdef CONFIG_SATA
-	setup_sata();
-#endif
 
 	return 0;
 }
