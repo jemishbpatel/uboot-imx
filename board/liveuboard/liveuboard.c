@@ -225,6 +225,49 @@ static struct mv88e6176_sw_reg switch_vlan_conf[] = {
 	{ PORT(6), PORT_CONTROL2, 0x2c80}
 };
 
+static struct mv88e6176_sw_reg spare_vlans_vtu_entry[] = {
+    /* Load VTU Entry */
+    { GLOBAL1, VTU_FID, 0x0},
+    { GLOBAL1, VTU_SID, 0x0},
+    { GLOBAL1, VSTU_DATA_P0TO3, 0x3332},
+    { GLOBAL1, VSTU_DATA_P4TO6, 0x0233}
+};
+
+static struct mv88e6176_sw_reg spare_vlans_stu_entry[] = {
+    /* Load STU Entry */
+    { GLOBAL1, VTU_FID, 0x0},
+    { GLOBAL1, VTU_SID, 0x0},
+    { GLOBAL1, VSTU_DATA_P0TO3, 0xCCCC},
+    { GLOBAL1, VSTU_DATA_P4TO6, 0x0CCC}
+};
+
+static struct mv88e6176_sw_reg spare_vlans_vlan_id[] = {
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_10_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_11_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_12_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_13_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_14_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_15_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_16_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_17_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_18_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_19_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_20_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_21_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_22_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_23_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_24_ID},
+    { GLOBAL1, VTU_VID, VTU_VALID_BIT | VLAN_25_ID}
+};
+
+static struct mv88e6176_sw_reg spare_vlans_stu_load[] = {
+    { GLOBAL1, VTU_OPS, VTU_BUSY_BIT | STU_LOAD_ENTRY}
+};
+
+static struct mv88e6176_sw_reg spare_vlans_vtu_load[] = {
+    { GLOBAL1, VTU_OPS, VTU_BUSY_BIT | VTU_LOAD_ENTRY}
+};
+
 static void setup_iomux_gpio(void)
 {
 	SETUP_IOMUX_PADS(gpio_pads);
@@ -938,15 +981,30 @@ int last_stage_init(void)
 {
 	/* configure MV88E6176 switch */
 	char *name = "FEC";
+	int vlan_id_offset;
 
 	if (miiphy_set_current_dev(name))
 		return 0;
 
 	mv88e6176_sw_program(name, MV88E6176_ADDRESS, switch_conf,
-	ARRAY_SIZE(switch_conf));
+			ARRAY_SIZE(switch_conf));
 
 	mv88e6176_sw_program(name, MV88E6176_ADDRESS, switch_vlan_conf,
 			ARRAY_SIZE(switch_vlan_conf));
+
+	for (vlan_id_offset = 0; vlan_id_offset < TOTAL_SPARE_VLAN; vlan_id_offset++) {
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, spare_vlans_vtu_entry,
+			ARRAY_SIZE(spare_vlans_vtu_entry));
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, &spare_vlans_vlan_id[vlan_id_offset], 1);
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, spare_vlans_vtu_load,
+			ARRAY_SIZE(spare_vlans_vtu_load));
+
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, spare_vlans_stu_entry,
+			ARRAY_SIZE(spare_vlans_stu_entry));
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, &spare_vlans_vlan_id[vlan_id_offset], 1);
+		mv88e6176_sw_program(name, MV88E6176_ADDRESS, spare_vlans_stu_load,
+			ARRAY_SIZE(spare_vlans_stu_load));
+	}
 
 	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
 
