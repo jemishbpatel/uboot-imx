@@ -169,6 +169,7 @@ int setup_mac_addresses(void);
 int setup_gpios(void);
 int enable_backlight(void);
 int get_hardware_revision(void);
+int vic_card_detection(void);
 #if defined(CONFIG_VID)
 int init_func_vid(void);
 #endif

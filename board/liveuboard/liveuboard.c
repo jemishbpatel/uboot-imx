@@ -1022,6 +1022,51 @@ int board_late_init(void)
 	return 0;
 }
 
+#define I2C_EEPROM_ADDRESS	0x57
+#define I2C_TIMEOUT_RETRY_COUNT	3
+
+int vic_card_detection(void)
+{
+	char buffer[MAX_BUFFER_SIZE];
+	char env_value[MAX_BUFFER_SIZE];
+	uchar chipAddr = I2C_EEPROM_ADDRESS;
+	uint regAddr = 0x0;
+	uchar value;
+	int ret = 0, retry_count = I2C_TIMEOUT_RETRY_COUNT;
+
+	i2c_set_bus_num(0);
+
+	do {
+		ret = i2c_read(chipAddr, regAddr, 1, &value, 1);
+		if(ret == 0) {
+			strncpy(env_value, "AVIC", MAX_BUFFER_SIZE);
+			break;
+		} else if (ret == -EREMOTEIO) {
+			strncpy(env_value, "CVIC", MAX_BUFFER_SIZE);
+			break;
+		} else {
+			printf("VIC card detection (i2c) error %d, retrying\n", ret);
+			retry_count--;
+			mdelay(10);
+		}
+	}
+	while(retry_count >= 0);
+
+	if(retry_count == -1) {
+		printf("Warning: fail to detect VIC type after %d retries\n",
+			I2C_TIMEOUT_RETRY_COUNT);
+		strncpy(env_value, "AVIC", MAX_BUFFER_SIZE);
+		printf("Setting explicitly VIC type as 'AVIC'");
+	}
+
+	memset(buffer, 0x00, sizeof(buffer));
+	sprintf(buffer, "setenv vic_type %s", env_value);
+	run_command(buffer, 0);
+
+	update_uboot_env_in_bootargs("vic_type", env_value);
+	return 0;
+}
+
 /* HW Team changed EEPROM slave address to 0x55, due to conflict with HDMI slave */
 #define EEPROM_SLAVE_ADDRESS (0x55)
 static int detect_i2c_eeprom(void)

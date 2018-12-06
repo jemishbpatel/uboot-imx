@@ -839,6 +839,7 @@ static init_fnc_t init_sequence_r[] = {
 	 * Interrupts) are up and running (i.e. the PC-style ISA
 	 * keyboard).
 	 */
+	vic_card_detection,
 	last_stage_init,
 	setup_gpios,
 #ifdef CONFIG_MXC_SPI
