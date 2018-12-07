@@ -170,6 +170,7 @@ int setup_gpios(void);
 int enable_backlight(void);
 int get_hardware_revision(void);
 int vic_card_detection(void);
+int get_liveu_model_type(void);
 #if defined(CONFIG_VID)
 int init_func_vid(void);
 #endif

@@ -772,6 +772,7 @@ static init_fnc_t init_sequence_r[] = {
 	 */
 	initr_pci,
 #endif
+	get_liveu_model_type,
 	stdio_add_devices,
 	initr_jumptable,
 #ifdef CONFIG_API

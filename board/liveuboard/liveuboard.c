@@ -38,6 +38,7 @@
 #include <pwm.h>
 #endif
 #include <spi_eeprom.h>
+#include <liveu_board.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -60,15 +61,30 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_DSE_40ohm	| PAD_CTL_SRE_FAST)
 
 #define UART_BUFFER_CONTROL	IMX_GPIO_NR(1, 6)
+#define GPIO_DRY_CONTACT2_EN	IMX_GPIO_NR(1, 7)
+#define GPIO_REAR_USB_EN	IMX_GPIO_NR(1, 8)
+#define GPIO_PCI_RESET		IMX_GPIO_NR(1, 16)
+#define GPIO_LCD_ON_OFF		IMX_GPIO_NR(1, 18)
 #define LCD_CAP_RST		IMX_GPIO_NR(1, 24)
+#define GPIO_DRY_CONTACT1_EN	IMX_GPIO_NR(1, 24)
 #define USDHC3_CD_GPIO		IMX_GPIO_NR(3, 9)
-#define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
+#define GPIO_WIFI_DISABLE	IMX_GPIO_NR(3, 19)
 #define GPIO_WIFI_EN		IMX_GPIO_NR(3, 20)
+#define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define GPIO_WLAN_VOLATGE	IMX_GPIO_NR(3, 31)
+#define GPIO_OSC_32_BT_EN	IMX_GPIO_NR(4, 15)
 #define GPIO_BOOT_POR_EN	IMX_GPIO_NR(7, 13)
 
+#define LIVEU_MODEL_TYPE_BIT0	IMX_GPIO_NR(1, 18)
+#define LIVEU_MODEL_TYPE_BIT1	IMX_GPIO_NR(1, 24)
+#define LIVEU_MODEL_TYPE_BIT2	IMX_GPIO_NR(2, 3)
+#define LIVEU_MODEL_TYPE_BIT3	IMX_GPIO_NR(2, 2)
+
+#define GPIO2_DATA_REGISTER	(0x20a0000)
 #define CCM_CCGR_1		(0x20c406c)
+#define ECSPI1_CLK_ENABLE	(0x3)
 #define ECSPI2_CLK_ENABLE	(0xC)
+#define ECSPI1_CLK_DISABLE	(0xfffffffc)
 #define ECSPI2_CLK_DISABLE	(0xfffffff3)
 #define ETHERNET_MAC_OFFSET	(19)
 #define USBETHERNET_MAC_OFFSET	(25)
@@ -79,6 +95,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define FEC_ADDR_LOW		(0x21880E4) /* Low 32bits MAC address */
 #define FEC_ADDR_HIGH		(0x21880E8) /* High 16bits MAC address */
 #define I2C_BUS_0		(0)
+#define I2C_BUS_1		(1)
+#define I2C_BUS_2		(2)
 #define SET_I2C_BUS(x)		I2C_BUS_##x
 /* Enabled Marvell switch MV88E6176 u-boot post command and
    SMI device address generated using ADDR[4:1] pull up pin
@@ -89,6 +107,17 @@ DECLARE_GLOBAL_DATA_PTR;
 #define DEFAULT_BRIGHTNESS_LEVEL	(20)
 #define CORECARD_REVISION_OFFSET	(50)
 #define LU600_BOARD_DEFAULT_HARDWARE_REVISION	('B')
+#define LU300_BOARD_DEFAULT_HARDWARE_REVISION	('C')
+#define GPIO_CONFIGURATION_STABLE_DURATION_MS	(150)
+
+_model_type model_type;
+unsigned int liveu_model_type_gpio[] = {
+				LIVEU_MODEL_TYPE_BIT0,
+				LIVEU_MODEL_TYPE_BIT1,
+				LIVEU_MODEL_TYPE_BIT2,
+				LIVEU_MODEL_TYPE_BIT3
+				};
+#define LIVEU_MODEL_TYPE_GPIOS	ARRAY_SIZE(liveu_model_type_gpio)
 
 int dram_init(void)
 {
@@ -98,17 +127,30 @@ int dram_init(void)
 }
 
 static iomux_v3_cfg_t const gpio_pads[] = {
+	IOMUX_PADS(PAD_GPIO_7__GPIO1_IO07     | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_GPIO_8__GPIO1_IO08     | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD1_DAT0__GPIO1_IO16   | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD1_CMD__GPIO1_IO18    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_ENET_RX_ER__GPIO1_IO24 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_NANDF_D0__GPIO2_IO00   | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_NANDF_D2__GPIO2_IO02   | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_NANDF_D3__GPIO2_IO03   | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_D19__GPIO3_IO19    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_D20__GPIO3_IO20    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_D31__GPIO3_IO31    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_GPIO_19__GPIO4_IO05    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_KEY_ROW4__GPIO4_IO15   | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
 static iomux_v3_cfg_t const uart1_pads[] = {
 	IOMUX_PADS(PAD_CSI0_DAT10__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
 	IOMUX_PADS(PAD_CSI0_DAT11__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
 	IOMUX_PADS(PAD_GPIO_6__GPIO1_IO06   	 | MUX_PAD_CTRL(NO_PAD_CTRL)),
+};
+
+static iomux_v3_cfg_t const uart1_2_pads[] = {
+	IOMUX_PADS(PAD_SD3_DAT6__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT7__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL)),
 };
 
 static iomux_v3_cfg_t const usdhc3_pads[] = {
@@ -275,7 +317,12 @@ static void setup_iomux_gpio(void)
 
 static void setup_iomux_uart(void)
 {
-	SETUP_IOMUX_PADS(uart1_pads);
+	u32 gpio32;
+	gpio32 = __raw_readl(GPIO2_DATA_REGISTER);
+	if (gpio32 & 0x1)
+		SETUP_IOMUX_PADS(uart1_pads);
+	else
+		SETUP_IOMUX_PADS(uart1_2_pads);
 }
 
 static void setup_iomux_enet(void)
@@ -521,12 +568,28 @@ iomux_v3_cfg_t const ecspi2_pads[] = {
 	IOMUX_PADS(PAD_GPIO_18__GPIO7_IO13 | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
+void ecspi1_clock_enable(void)
+{
+	u32 ecspi_clk;
+	ecspi_clk = __raw_readl(CCM_CCGR_1);
+	ecspi_clk |= ECSPI1_CLK_ENABLE;
+	__raw_writel(ecspi_clk, CCM_CCGR_1);
+}
+
 void ecspi2_clock_enable(void)
 {
 	u32 ecspi_clk;
 
 	ecspi_clk = __raw_readl(CCM_CCGR_1);
 	ecspi_clk |= ECSPI2_CLK_ENABLE;
+	__raw_writel(ecspi_clk, CCM_CCGR_1);
+}
+
+void ecspi1_clock_disable(void)
+{
+	u32 ecspi_clk;
+	ecspi_clk = __raw_readl(CCM_CCGR_1);
+	ecspi_clk &= ECSPI1_CLK_DISABLE;
 	__raw_writel(ecspi_clk, CCM_CCGR_1);
 }
 
@@ -541,28 +604,24 @@ void ecspi2_clock_disable(void)
 
 void spi_clock_enable(void)
 {
+	ecspi1_clock_enable();
 	ecspi2_clock_enable();
 }
 
 
 void spi_clock_disable(void)
 {
+	ecspi1_clock_disable();
 	ecspi2_clock_disable();
 }
 
 void setup_clock_and_chipselect(void)
 {
 	spi_clock_enable();
-	gpio_request(ECSPI2_SPI_CHIPSELECT, "eeprom_cs");
+
+	gpio_direction_output(GPIO_BOOT_POR_EN , 1);
 	gpio_direction_output(ECSPI2_SPI_CHIPSELECT, 0);
-	gpio_set_value(ECSPI2_SPI_CHIPSELECT, 0);
-
-	gpio_request(EEPROM_WRITE_PROTECT, "eeprom_wp");
 	gpio_direction_output(EEPROM_WRITE_PROTECT, 1);
-	gpio_set_value(EEPROM_WRITE_PROTECT, 1);
-
-	gpio_direction_output(GPIO_BOOT_POR_EN , 0);
-	gpio_set_value(GPIO_BOOT_POR_EN, 1);
 }
 
 void setup_spi(void)
@@ -725,7 +784,6 @@ static iomux_v3_cfg_t const lcd_display_pads[] = {
 	IOMUX_PADS(PAD_DISP0_DAT21__IPU1_DISP0_DATA21),
 	IOMUX_PADS(PAD_DISP0_DAT22__IPU1_DISP0_DATA22),
 	IOMUX_PADS(PAD_DISP0_DAT23__IPU1_DISP0_DATA23),
-	IOMUX_PADS(PAD_SD1_CMD__GPIO1_IO18 | MUX_PAD_CTRL(NO_PAD_CTRL)),
 #if defined(CONFIG_PWMCNTL_BACKLIGHT)
 	IOMUX_PADS(PAD_SD1_DAT1__PWM3_OUT | MUX_PAD_CTRL(NO_PAD_CTRL)),   /* LCDCNTL */
 #else
@@ -742,7 +800,18 @@ static int detect_i2c(struct display_info_t const *dev)
 {
 	/* Always return as detected to make it simple and
 	   to keep the existing logic as modular for future purpose */
-	return 1;
+	switch (model_type)
+	{
+		case BOARD_LU600:
+			gpio_direction_output(GPIO_LCD_ON_OFF, 1);
+			return 1;
+		break;
+		case BOARD_LU300:
+		case BOARD_LU610:
+		default:
+			return 0;
+		break;
+	}
 }
 
 static void enable_tianma_5wvga(struct display_info_t const *dev)
@@ -831,13 +900,22 @@ static void setup_display(void)
 void get_corecard_revision(unsigned char *hardware_revision)
 {
 	unsigned int offset = CORECARD_REVISION_OFFSET;
+
 	if( read_eeprom(offset, hardware_revision, 1) ) {
 		printf("Warning: failed read corecard revision info, setting 'B' as default\n");
-		*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+		if (BOARD_LU600 == model_type)
+			*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+		else if ((BOARD_LU300 == model_type) || (BOARD_LU610 == model_type))
+			*hardware_revision = LU300_BOARD_DEFAULT_HARDWARE_REVISION;
 	}
 	/* if reading EEPROM doesn't have value in between 'E' to 'Z' */
 	if( !((*hardware_revision >= 'E') && (*hardware_revision <= 'Z')) )
-		*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+	{
+		if (BOARD_LU600 == model_type)
+			*hardware_revision = LU600_BOARD_DEFAULT_HARDWARE_REVISION;
+		else if ((BOARD_LU300 == model_type) || (BOARD_LU610 == model_type))
+			*hardware_revision = LU300_BOARD_DEFAULT_HARDWARE_REVISION;
+	}
 }
 
 int get_hardware_revision(void)
@@ -977,6 +1055,11 @@ int configure_ioexpanders(void)
 	return 0;
 }
 
+static void bring_ctp_out_of_reset(void)
+{
+	gpio_direction_output(LCD_CAP_RST, 1);
+}
+
 int last_stage_init(void)
 {
 	/* configure MV88E6176 switch */
@@ -1008,7 +1091,12 @@ int last_stage_init(void)
 
 	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
 
-	configure_ioexpanders();
+	if (BOARD_LU600 == model_type)
+		configure_ioexpanders();
+
+	if (BOARD_LU600 == model_type)
+		bring_ctp_out_of_reset();
+
 	return 0;
 }
 
@@ -1028,20 +1116,49 @@ int board_early_init_f(void)
 	return 0;
 }
 
+void configure_usb_gpios(void)
+{
+	gpio_direction_output(GPIO_DRY_CONTACT2_EN, 0);
+	gpio_direction_output(GPIO_REAR_USB_EN, 0);
+	gpio_direction_output(GPIO_DRY_CONTACT1_EN, 0);
+}
+
+void configure_pci_wlan_gpios(void)
+{
+	struct iomuxc *iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
+	clrbits_le32(&iomuxc_regs->gpr[12], IOMUXC_GPR12_APPS_LTSSM_ENABLE);
+
+	gpio_direction_output(GPIO_WIFI_EN, 0);
+	gpio_direction_output(GPIO_WIFI_DISABLE, 0);
+	gpio_direction_output(GPIO_PCI_RESET, 0);
+	gpio_direction_output(GPIO_OSC_32_BT_EN, 0);
+
+	mdelay(100);
+
+	gpio_set_value(GPIO_WIFI_DISABLE, 1);
+	gpio_set_value(GPIO_WIFI_EN, 1);
+
+	mdelay(100);
+	gpio_set_value(GPIO_OSC_32_BT_EN, 1);
+}
 
 static void configure_wl18xx_gpio(void)
 {
-	gpio_direction_output(GPIO_WLAN_VOLATGE , 0);
-	gpio_set_value(GPIO_WLAN_VOLATGE, 1);
-
-	gpio_direction_output(GPIO_WIFI_EN , 0);
-	gpio_set_value(GPIO_WIFI_EN, 1);
+	gpio_direction_output(GPIO_WLAN_VOLATGE , 1);
+	gpio_direction_output(GPIO_WIFI_EN , 1);
 }
 
 int setup_gpios(void)
 {
 	int ret = 0;
-	configure_wl18xx_gpio();
+	if (BOARD_LU600 == model_type) {
+		configure_wl18xx_gpio();
+	} else {
+		configure_pci_wlan_gpios();
+		if (BOARD_LU610 == model_type) {
+			configure_usb_gpios();
+		}
+	}
 	return ret;
 }
 
@@ -1136,13 +1253,11 @@ static int detect_i2c_eeprom(void)
 static void configure_uart_normal(void)
 {
 	gpio_direction_output(UART_BUFFER_CONTROL, 0);
-	gpio_set_value(UART_BUFFER_CONTROL, 0);
 }
 
 static void configure_uart_crossed(void)
 {
 	gpio_direction_output(UART_BUFFER_CONTROL, 1);
-	gpio_set_value(UART_BUFFER_CONTROL, 1);
 }
 
 static void check_if_jig_is_connected_with_eeprom_on_i2c(void)
@@ -1156,6 +1271,7 @@ static void check_if_jig_is_connected_with_eeprom_on_i2c(void)
 
 #if defined(CONFIG_CONFIGURE_FAN)
 #define FAN_CONTROLLER_SLAVE_ADDR_18		(0x18)
+#define FAN_CONTROLLER_SLAVE_ADDR_19		(0x19)
 int configure_fan(uchar i2c_bus_number, uchar chipAddr)
 {
 	uint   regAddr;
@@ -1202,18 +1318,28 @@ int configure_fan(uchar i2c_bus_number, uchar chipAddr)
 }
 #endif
 
+int check_if_modem_board_present(void)
+{
+	uchar chipAddr = 0x20;
+	uint   regAddr = 0x00;
+	uchar   value;
+
+	i2c_set_bus_num(1);
+	return i2c_read(chipAddr, regAddr, 1, &value, 1);
+}
+
 int misc_init_r(void)
 {
 	check_if_jig_is_connected_with_eeprom_on_i2c();
 #ifdef CONFIG_CONFIGURE_FAN
 	configure_fan(SET_I2C_BUS(0), FAN_CONTROLLER_SLAVE_ADDR_18);
+	if (BOARD_LU610 == model_type) {
+		configure_fan(SET_I2C_BUS(1), FAN_CONTROLLER_SLAVE_ADDR_18);
+		if (!check_if_modem_board_present())
+			configure_fan(SET_I2C_BUS(1), FAN_CONTROLLER_SLAVE_ADDR_19);
+	}
 #endif
 	return 0;
-}
-
-static void bring_ctp_out_of_reset(void)
-{
-	gpio_direction_output(LCD_CAP_RST, 1);
 }
 
 int board_init(void)
@@ -1224,7 +1350,6 @@ int board_init(void)
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
-	bring_ctp_out_of_reset();
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c1_pad_info);
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c2_pad_info);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &mx6q_i2c3_pad_info);
@@ -1237,5 +1362,65 @@ int board_init(void)
 
 int checkboard(void)
 {
+	return 0;
+}
+
+void set_liveu_model_type(char *env_value)
+{
+	char buffer[MAX_BUFFER_SIZE];
+
+	memset(buffer, 0x00, sizeof(buffer));
+	sprintf(buffer, "setenv model_type %s", env_value);
+	run_command(buffer, 0);
+
+	update_uboot_env_in_bootargs("model_type", env_value);
+}
+
+int get_liveu_model_type(void)
+{
+	int i = 0;
+	int gpio_value[LIVEU_MODEL_TYPE_GPIOS];
+	char env_value[MAX_BUFFER_SIZE];
+
+	for (i = 0; i < LIVEU_MODEL_TYPE_GPIOS; i++) {
+		gpio_direction_input(liveu_model_type_gpio[i]);
+	}
+	mdelay(GPIO_CONFIGURATION_STABLE_DURATION_MS);
+	for (i = 0; i < LIVEU_MODEL_TYPE_GPIOS; i++) {
+		gpio_value[i] = gpio_get_value(liveu_model_type_gpio[i]);
+	}
+	if ( 0 == gpio_value[3]) {
+		model_type = BOARD_LU600;
+	} else {
+		for (i = 0 ; i < LIVEU_MODEL_TYPE_GPIOS; i++) {
+			model_type |= (gpio_value[i] << i);
+		}
+	}
+	puts("BOARD: ");
+	switch ((int)model_type)
+	{
+		case BOARD_LU600:
+			puts("LU600\n");
+			strcpy(env_value, "LU600");
+		break;
+		case BOARD_LU300:
+		case BOARD_LU300_WORKAROUND_VALUE:
+			model_type = BOARD_LU300;
+			puts("LU300\n");
+			strcpy(env_value, "LU300");
+		break;
+		case BOARD_LU610:
+		case BOARD_LU610_WORKAROUND_VALUE:
+			model_type = BOARD_LU610;
+			puts("LU610\n");
+			strcpy(env_value, "LU610");
+		break;
+		default:
+			puts("Invalid\n");
+	}
+	for (i = 0; i < LIVEU_MODEL_TYPE_GPIOS; i++) {
+		gpio_free(liveu_model_type_gpio[i]);
+	}
+	set_liveu_model_type(env_value);
 	return 0;
 }
