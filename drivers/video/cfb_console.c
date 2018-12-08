@@ -70,6 +70,7 @@
 #include <malloc.h>
 #include <video.h>
 #include <linux/compiler.h>
+#include <liveu_board.h>
 
 #if defined(CONFIG_VIDEO_MXS)
 #define VIDEO_FB_16BPP_WORD_SWAP
@@ -150,6 +151,8 @@ void console_cursor(int state);
 #ifdef	CONFIG_VIDEO_BMP_LOGO
 #include <bmp_logo.h>
 #include <bmp_logo_data.h>
+#include <bmp_logo_lu300.h>
+#include <bmp_logo_data_lu300.h>
 #define VIDEO_LOGO_WIDTH	BMP_LOGO_WIDTH
 #define VIDEO_LOGO_HEIGHT	BMP_LOGO_HEIGHT
 #define VIDEO_LOGO_LUT_OFFSET	BMP_LOGO_OFFSET
@@ -252,6 +255,11 @@ static int ansi_buf_size;
 static int ansi_colors_need_revert;
 static int ansi_cursor_hidden;
 #endif
+
+static int bmp_logo_width;
+static int bmp_logo_height;
+static int bmp_logo_lut_offset;
+static int bmp_logo_colors;
 
 static const int video_font_draw_table8[] = {
 	0x00000000, 0x000000ff, 0x0000ff00, 0x0000ffff,
@@ -1725,35 +1733,52 @@ static void plot_logo_or_black(void *screen, int x, int y, int black)
 	int skip = VIDEO_LINE_LEN - VIDEO_LOGO_WIDTH * VIDEO_PIXEL_SIZE;
 	int ycount = video_logo_height;
 	unsigned char r, g, b, *logo_red, *logo_blue, *logo_green;
-	unsigned char *source;
+	unsigned char *source = bmp_logo_bitmap;
 	unsigned char *dest;
+	unsigned short *bitmap_palette = bmp_logo_palette;
+
+	if (model_type == BOARD_LU600) {
+		source = bmp_logo_bitmap;
+		bitmap_palette = bmp_logo_palette;
+		bmp_logo_width = BMP_LOGO_WIDTH;
+		bmp_logo_height = BMP_LOGO_HEIGHT;
+		bmp_logo_colors = BMP_LOGO_COLORS;
+		bmp_logo_lut_offset = BMP_LOGO_OFFSET;
+	}
+	else if ((model_type == BOARD_LU300) || (model_type == BOARD_LU610)) {
+		source = bmp_logo_bitmap_lu300;
+		bitmap_palette = bmp_logo_palette_lu300;
+		bmp_logo_width = BMP_LOGO_WIDTH_LU300;
+		bmp_logo_height = BMP_LOGO_HEIGHT_LU300;
+		bmp_logo_colors = BMP_LOGO_COLORS_LU300;
+		bmp_logo_lut_offset = BMP_LOGO_OFFSET_LU300;
+	}
+	skip = VIDEO_LINE_LEN - bmp_logo_width * VIDEO_PIXEL_SIZE;
 
 #ifdef CONFIG_SPLASH_SCREEN_ALIGN
 	if (x == BMP_ALIGN_CENTER)
-		x = max(0, (int)(VIDEO_VISIBLE_COLS - VIDEO_LOGO_WIDTH) / 2);
+		x = max(0, (int)(VIDEO_VISIBLE_COLS - bmp_logo_width) / 2);
 	else if (x < 0)
-		x = max(0, (int)(VIDEO_VISIBLE_COLS - VIDEO_LOGO_WIDTH + x + 1));
+		x = max(0, (int)(VIDEO_VISIBLE_COLS - bmp_logo_width + x + 1));
 
 	if (y == BMP_ALIGN_CENTER)
-		y = max(0, (int)(VIDEO_VISIBLE_ROWS - VIDEO_LOGO_HEIGHT) / 2);
+		y = max(0, (int)(VIDEO_VISIBLE_ROWS - bmp_logo_height) / 2);
 	else if (y < 0)
-		y = max(0, (int)(VIDEO_VISIBLE_ROWS - VIDEO_LOGO_HEIGHT + y + 1));
+		y = max(0, (int)(VIDEO_VISIBLE_ROWS - bmp_logo_height + y + 1));
 #endif /* CONFIG_SPLASH_SCREEN_ALIGN */
 
 	dest = (unsigned char *)screen + y * VIDEO_LINE_LEN + x * VIDEO_PIXEL_SIZE;
 
 #ifdef CONFIG_VIDEO_BMP_LOGO
-	source = bmp_logo_bitmap;
-
 	/* Allocate temporary space for computing colormap */
-	logo_red = malloc(BMP_LOGO_COLORS);
-	logo_green = malloc(BMP_LOGO_COLORS);
-	logo_blue = malloc(BMP_LOGO_COLORS);
+	logo_red = malloc(bmp_logo_colors);
+	logo_green = malloc(bmp_logo_colors);
+	logo_blue = malloc(bmp_logo_colors);
 	/* Compute color map */
 	for (i = 0; i < VIDEO_LOGO_COLORS; i++) {
-		logo_red[i] = (bmp_logo_palette[i] & 0x0f00) >> 4;
-		logo_green[i] = (bmp_logo_palette[i] & 0x00f0);
-		logo_blue[i] = (bmp_logo_palette[i] & 0x000f) << 4;
+		logo_red[i] = (bitmap_palette[i] & 0x0f00) >> 4;
+		logo_green[i] = (bitmap_palette[i] & 0x00f0);
+		logo_blue[i] = (bitmap_palette[i] & 0x000f) << 4;
 	}
 #else
 	source = linux_logo;
@@ -1763,8 +1788,8 @@ static void plot_logo_or_black(void *screen, int x, int y, int black)
 #endif
 
 	if (VIDEO_DATA_FORMAT == GDF__8BIT_INDEX) {
-		for (i = 0; i < VIDEO_LOGO_COLORS; i++) {
-			video_set_lut(i + VIDEO_LOGO_LUT_OFFSET,
+		for (i = 0; i < bmp_logo_colors; i++) {
+			video_set_lut(i + bmp_logo_lut_offset,
 				      logo_red[i], logo_green[i],
 				      logo_blue[i]);
 		}
@@ -1774,16 +1799,16 @@ static void plot_logo_or_black(void *screen, int x, int y, int black)
 #if defined(VIDEO_FB_16BPP_PIXEL_SWAP)
 		int xpos = x;
 #endif
-		xcount = VIDEO_LOGO_WIDTH;
+		xcount = bmp_logo_width;
 		while (xcount--) {
 			if (black) {
 				r = 0x00;
 				g = 0x00;
 				b = 0x00;
 			} else {
-				r = logo_red[*source - VIDEO_LOGO_LUT_OFFSET];
-				g = logo_green[*source - VIDEO_LOGO_LUT_OFFSET];
-				b = logo_blue[*source - VIDEO_LOGO_LUT_OFFSET];
+				r = logo_red[*source - bmp_logo_lut_offset];
+				g = logo_green[*source - bmp_logo_lut_offset];
+				b = logo_blue[*source - bmp_logo_lut_offset];
 			}
 
 			switch (VIDEO_DATA_FORMAT) {
