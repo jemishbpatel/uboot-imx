@@ -54,3 +54,4 @@ obj-$(CONFIG_STM32_RCC) += stm32_rcc.o
 obj-$(CONFIG_STM32MP_FUSE) += stm32mp_fuse.o
 obj-$(CONFIG_SYS_DPAA_QBMAN) += fsl_portals.o
 obj-$(CONFIG_GDSYS_RXAUI_CTRL) += gdsys_rxaui_ctrl.o
+obj-$(CONFIG_PANEL_ST7789V) += panel-sitronix-st7789v.o

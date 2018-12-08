@@ -253,6 +253,14 @@ int spi_set_wordlen(struct spi_slave *slave, unsigned int wordlen);
 int  spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 		void *din, unsigned long flags);
 
+/* spi_xfer API works very well when we have to tranfer data interms of bytes
+ * in case we have to tranfer 9bit or 10bit this doesn't handle it properly
+ * for that purpose user can use following API. It has been verified with ST7789V
+ * panel driver
+ */
+int spi_xfer_nbit(struct spi_slave *slave, unsigned int bitlen, const void *dout,
+                void *din, unsigned long flags);
+
 /* Copy memory mapped data */
 void spi_flash_copy_mmap(void *data, void *offset, size_t len);
 

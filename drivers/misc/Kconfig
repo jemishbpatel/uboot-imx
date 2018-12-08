@@ -287,4 +287,11 @@ config CONFIGURE_FAN
 config LIVEUBORAD_PASSWORD
 	bool "Enable Password for LiveU boards"
 
+config PANEL_ST7789V
+	bool "ST7789V driver IC LCD panel driver"
+	depends on SPI && MXC_SPI
+	default y
+	  help
+	    Enable this driver for STV7789V LCD panel support. We are using
+            LCD with STV7789V driver IC in LU300 and LU610.
 endmenu

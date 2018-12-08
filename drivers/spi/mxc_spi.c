@@ -13,6 +13,8 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
 #include <asm/mach-imx/spi.h>
+#include <liveu_board.h>
+#include <panel-sitronix-st7789v.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -24,8 +26,21 @@ DECLARE_GLOBAL_DATA_PTR;
 "See linux mxc_spi driver from Freescale for details."
 #endif
 
-__weak int board_spi_cs_gpio(unsigned bus, unsigned cs)
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
+	switch(model_type)
+	{
+		case BOARD_LU600:
+			return -1;
+		break;
+		case BOARD_LU300:
+		case BOARD_LU610:
+			if ((0 == bus) && (0 == cs))
+				return ECSPI1_SPI_CHIPSELECT_PANEL_ST7789V;
+			if ((1 == bus) && (0 == cs))
+				return -1;
+		break;
+	}
 	return -1;
 }
 
@@ -215,6 +230,47 @@ static s32 spi_cfg_mxc(struct mxc_spi_slave *mxcs, unsigned int cs)
 }
 #endif
 
+int spi_xchg_nbit(struct spi_slave *slave, unsigned int bitlen,
+	const u16 *dout, u8 *din, unsigned long flags)
+{
+	struct mxc_spi_slave *mxcs = to_mxc_spi_slave(slave);
+	struct cspi_regs *regs = (struct cspi_regs *)mxcs->base;
+	u32 ts;
+	int status;
+
+	debug("%s: bitlen %d dout 0x%x din 0x%x\n",
+		__func__, bitlen, (u32)dout, (u32)din);
+
+	mxcs->ctrl_reg = (mxcs->ctrl_reg &
+		~MXC_CSPICTRL_BITCOUNT(MXC_CSPICTRL_MAXBITS)) |
+		MXC_CSPICTRL_BITCOUNT(bitlen - 1);
+	reg_write(&regs->ctrl, mxcs->ctrl_reg | MXC_CSPICTRL_EN);
+#ifdef MXC_ECSPI
+	reg_write(&regs->cfg, mxcs->cfg_reg);
+#endif
+	/* Clear interrupt register */
+	reg_write(&regs->stat, MXC_CSPICTRL_TC | MXC_CSPICTRL_RXOVF);
+	reg_write(&regs->txdata, *dout);
+
+	/* FIFO is written, now starts the transfer setting the XCH bit */
+	reg_write(&regs->ctrl, mxcs->ctrl_reg |
+		MXC_CSPICTRL_EN | MXC_CSPICTRL_XCH);
+
+	status = reg_read(&regs->stat);
+	ts = get_timer(0);
+	/* Wait until the TC (Transfer completed) bit is set */
+	while ((status & MXC_CSPICTRL_TC) == 0) {
+		if (get_timer(ts) > CONFIG_SYS_SPI_MXC_WAIT) {
+			printf("spi_xchg_single: Timeout!\n");
+			return -1;
+		}
+		status = reg_read(&regs->stat);
+	}
+	/* Transfer completed, clear any pending request */
+	reg_write(&regs->stat, MXC_CSPICTRL_TC | MXC_CSPICTRL_RXOVF);
+	return 0;
+}
+
 int spi_xchg_single(struct mxc_spi_slave *mxcs, unsigned int bitlen,
 	const u8 *dout, u8 *din, unsigned long flags)
 {
@@ -328,6 +384,27 @@ int spi_xchg_single(struct mxc_spi_slave *mxcs, unsigned int bitlen,
 
 	return 0;
 
+}
+
+int spi_xfer_nbit(struct spi_slave *slave, unsigned int bitlen, const void *dout,
+		void *din, unsigned long flags)
+{
+	int ret;
+	u8 *p_outbuf = (u8 *)dout;
+	u8 *p_inbuf = (u8 *)din;
+
+	if (!slave)
+		return -1;
+
+	if (flags & SPI_XFER_BEGIN)
+		mxc_spi_cs_activate(to_mxc_spi_slave(slave));
+
+	ret = spi_xchg_nbit(slave, bitlen, (u16*)p_outbuf, p_inbuf, 0);
+
+	if (flags & SPI_XFER_END)
+		mxc_spi_cs_deactivate(to_mxc_spi_slave(slave));
+
+	return ret;
 }
 
 static int mxc_spi_xfer_internal(struct mxc_spi_slave *mxcs,

@@ -39,6 +39,7 @@
 #endif
 #include <spi_eeprom.h>
 #include <liveu_board.h>
+#include <panel-sitronix-st7789v.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -814,7 +815,7 @@ static int detect_i2c(struct display_info_t const *dev)
 	}
 }
 
-static void enable_tianma_5wvga(struct display_info_t const *dev)
+static void enable_lcd(struct display_info_t const *dev)
 {
 	SETUP_IOMUX_PADS(lcd_display_pads);
 #if defined(CONFIG_PWMCNTL_BACKLIGHT)
@@ -827,7 +828,49 @@ static void enable_tianma_5wvga(struct display_info_t const *dev)
 
 }
 
-struct display_info_t const displays[] = {{
+static int detect_spi(struct display_info_t const *dev)
+{
+	switch (model_type)
+	{
+		case BOARD_LU300:
+		case BOARD_LU610:
+			return 1;
+		break;
+		case BOARD_LU600:
+		default:
+			return 0;
+		break;
+	}
+}
+
+struct display_info_t const displays[] = {
+{
+	.bus = -1,
+	.addr = 0,
+	.pixfmt = IPU_PIX_FMT_RGB666,
+	.detect = detect_spi,
+	.enable = enable_lcd,
+	/* Timings inserted based on imx kernel source
+	 * driver/video/mx3fb.c line number 134.
+	*/
+	.mode = {
+                .name           = "KSF0200BCP03DF-1",
+                .refresh        = 60,
+                .xres           = 240,
+                .yres           = 320,
+                .pixclock       = 142857,
+                .left_margin    = 38,
+                .right_margin   = 10,
+                .upper_margin   = 8,
+                .lower_margin   = 4,
+                .hsync_len      = 4,
+                .vsync_len      = 10,
+                .sync           = 0,
+                .vmode          = FB_VMODE_NONINTERLACED,
+		.flag		= FB_MODE_IS_DETAILED
+	}
+},
+{
 	/* I2C bus number (I2C2) at which CTP is connected */
 	.bus	= 1,
 	/* I2C slave address of CTP, it could be 0x48/0x49/0x4a/0x4b */
@@ -835,7 +878,7 @@ struct display_info_t const displays[] = {{
 	/* LCD display pixel format RGB888 24-bit */
 	.pixfmt	= IPU_PIX_FMT_RGB24,
 	.detect	= detect_i2c,
-	.enable	= enable_tianma_5wvga,
+	.enable	= enable_lcd,
 	/* Timings inserted based on
 		1) Table 5.2.2 on Page# 10 of EVK module,
 		2) Kernel file "Documentation/fb/framebuffer.txt" and
@@ -876,6 +919,7 @@ struct display_info_t const displays[] = {{
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
 } },};
+
 size_t display_count = ARRAY_SIZE(displays);
 
 static void setup_display(void)
@@ -1091,11 +1135,13 @@ int last_stage_init(void)
 
 	mv88e6176_sw_reset(name, MV88E6176_ADDRESS);
 
-	if (BOARD_LU600 == model_type)
+	if (BOARD_LU600 == model_type) {
 		configure_ioexpanders();
-
-	if (BOARD_LU600 == model_type)
 		bring_ctp_out_of_reset();
+	}
+
+	if ((BOARD_LU300 == model_type) || (BOARD_LU610 == model_type))
+		configure_panel_st7789v();
 
 	return 0;
 }
