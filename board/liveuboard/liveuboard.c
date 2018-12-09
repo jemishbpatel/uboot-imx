@@ -73,6 +73,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GPIO_WIFI_EN		IMX_GPIO_NR(3, 20)
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 #define GPIO_WLAN_VOLATGE	IMX_GPIO_NR(3, 31)
+#define GPIO_WATCHDOG_DISABLE	IMX_GPIO_NR(4, 10)
 #define GPIO_OSC_32_BT_EN	IMX_GPIO_NR(4, 15)
 #define GPIO_BOOT_POR_EN	IMX_GPIO_NR(7, 13)
 
@@ -140,6 +141,7 @@ static iomux_v3_cfg_t const gpio_pads[] = {
 	IOMUX_PADS(PAD_EIM_D20__GPIO3_IO20    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_D31__GPIO3_IO31    | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_GPIO_19__GPIO4_IO05    | MUX_PAD_CTRL(NO_PAD_CTRL)),
+	IOMUX_PADS(PAD_KEY_COL2__GPIO4_IO10   | MUX_PAD_CTRL(NO_PAD_CTRL)),
 	IOMUX_PADS(PAD_KEY_ROW4__GPIO4_IO15   | MUX_PAD_CTRL(NO_PAD_CTRL)),
 };
 
@@ -1422,12 +1424,18 @@ void set_liveu_model_type(char *env_value)
 	update_uboot_env_in_bootargs("model_type", env_value);
 }
 
+void disable_watchdog(void)
+{
+	gpio_direction_output(GPIO_WATCHDOG_DISABLE, 1);
+}
+
 int get_liveu_model_type(void)
 {
 	int i = 0;
 	int gpio_value[LIVEU_MODEL_TYPE_GPIOS];
 	char env_value[MAX_BUFFER_SIZE];
 
+	disable_watchdog();
 	for (i = 0; i < LIVEU_MODEL_TYPE_GPIOS; i++) {
 		gpio_direction_input(liveu_model_type_gpio[i]);
 	}
