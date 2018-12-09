@@ -1,0 +1,15 @@
+stages:
+    - build
+
+.build-with: &build-with
+    stage: build
+    tags:
+        - ubuntu-16.04
+    script:
+        - T=( ${CI_BUILD_NAME} )
+        - ./build --debug -c ${T[1]} -t ${T[3]} setup
+        - ./build --debug all
+
+
+# config liveu_mini_defconfig toolchain LINARO_495
+config default toolchain default: *build-with

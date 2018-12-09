@@ -1,0 +1,216 @@
+#!/usr/bin/python2
+
+'''Builds buildroot in docker env
+'''
+
+prog_name = "build"
+prog_version = "2.0"
+prog_epilog = '''
+Run '%(prog)s help' to get toolchain and config info
+
+Example:
+   %(prog)s -t CODESOURCERY_ARM_483 setup
+   %(prog)s -t /opt/liveu-dev/CodeSourcery/arm-2009q1/bin/arm-none-linux-gnueabi-  setup
+   %(prog)s all
+   %(prog)s shell
+'''
+
+actions = [
+    'help',
+    'shell',
+    'setup',
+    'all',
+    'clean',
+    'distclean',
+    'config',
+    'build',
+    'install'
+]
+
+image = "docker:5000/liveu/liveu-dev:16.04-6-8"
+
+
+############################################################
+# {{{ Misc: imports, argument parsing, logging
+
+# Imports
+import logging
+import argparse
+import json
+import os
+import re
+import sys
+import subprocess as sp
+
+
+def parse_command_line():
+    p = argparse.ArgumentParser(
+        prog=prog_name,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        epilog=prog_epilog)
+    p.add_argument("--debug", help="debug mode", dest='debug', action="store_true")
+    p.add_argument("--version", action='version', version='%(prog)s ' + prog_version)
+    p.add_argument("-t", help="cross toolchain name. Default: %(default)s",
+                   dest='toolchain', metavar='name', default='default')
+    p.add_argument("-c", help="def config. Default: %(default)s",
+                   dest='config', metavar='name', default='default')
+    p.add_argument("--image", help="docker image name. Default: %(default)s",
+                   default=image)
+    p.add_argument("action", help="actions. Choices: %(choices)s. Default: %(default)s",
+                   nargs='?', metavar='cmd', choices=actions, default='help')
+    return p.parse_known_args()
+
+Args, UnknownArgs = parse_command_line()
+
+# Logging
+logging.basicConfig(
+    level=logging.DEBUG if Args.debug else logging.INFO,
+    format="%(message)s")
+log = logging.getLogger()
+
+log.debug("Args: %s", json.dumps(vars(Args), indent=4, sort_keys=True))
+log.debug("Args Unknown: %s", UnknownArgs)
+
+# }}}
+############################################################
+
+############################################################
+# {{{ Run shell commands
+
+run_fmt = {
+    "pwd": os.getcwd()
+}
+
+def run(cmd):
+    cmd = cmd % run_fmt
+    log.debug("Command '%s'", cmd)
+    kwargs = {'shell': True, 'executable': '/bin/bash'}
+    sp.check_call(cmd, **kwargs)
+
+def run_output(cmd, hide_stderr=True, strip=True, ignore_error=False):
+    cmd = cmd % run_fmt
+    log.debug("cmd '%s'", cmd)
+    kwargs = {'shell': True, 'executable': '/bin/bash'}
+    if hide_stderr:
+        kwargs['stderr'] = open('/dev/null', 'r')
+    try:
+        rc = sp.check_output(cmd, **kwargs)
+    except Exception as e:
+        if ignore_error:
+            return ''
+        raise e
+    if strip:
+        rc = rc.strip()
+    return rc
+
+# }}}
+############################################################
+
+
+class BuildEnv(object):
+
+    def __init__(self):
+        self.env = {}
+        self.values = {}
+        self.init_env()
+
+    def init_env(self):
+        self.init_env_pfx('TOOLCHAIN', ['DEFAULT' , 'CURRENT'])
+        self.init_env_pfx('CONFIG', ['DEFAULT' , 'CURRENT'])
+        self.init_env_pfx('BUILD', ['CLEAN', 'DISTCLEAN', 'CONFIG', 'BUILD'])
+        log.debug("Env: %s", json.dumps(self.env, indent=4, sort_keys=True))
+
+    def init_env_pfx(self, pfx, sfx_required=[]):
+        # get available toolchains
+        xtools = {}
+        run_fmt['pfx'] = pfx
+        txt = run_output("source .build-env.sh; for v in ${!%(pfx)s_*}; do echo $v; done")
+        for t in txt.split():
+            val = run_output("source .build-env.sh; echo $" + t)
+            # log.debug("xtool %s = '%s'", t, val)
+            self.env[t] = val
+        for s in sfx_required:
+            key = pfx + '_' + s
+            if key not in self.env:
+                raise Exception("Variable %s_%s is undefned" % (pfx, s))
+        pfxlen = len(pfx) + 1
+        keys = [ k[pfxlen:] for k in self.env.keys() \
+                if k.startswith(pfx) and not k.endswith('CURRENT') ]
+        self.values[pfx] = keys
+
+
+    def do(self, action):
+        log.info("build: run '%s' action", action)
+        func = getattr(self, 'do_' + action, None)
+        if func:
+            return func()
+        key = 'build_' + action
+        key = key.upper()
+        if key in self.env:
+            run(self.env[key])
+            return
+
+    def do_help(self):
+        def do_help_arg(spfx, pfx):
+            print "Use %s option to select a %s" % (spfx, pfx.lower())
+            for k in sorted(self.values[pfx]):
+                print " ", k
+            print
+
+        do_help_arg("-t", "TOOLCHAIN")
+        do_help_arg("-c", "CONFIG")
+
+    def do_shell(self):
+        run('bash')
+
+    def do_all(self):
+        self.do('distclean')
+        self.do('config')
+        self.do('build')
+        self.do('install')
+
+    def do_setup(self):
+        env = open('.build-env.sh', 'r').read()
+
+        def do_setup_param(pfx, value):
+            sre = '(?m)^' + pfx + '_CURRENT=.*'
+            if value.upper() in self.values[pfx]:
+                rpl = pfx + '_CURRENT=$' + pfx + '_' + value.upper()
+            else:
+                rpl = pfx + '_CURRENT=' + value
+
+            return re.sub(sre, rpl, env)
+
+        env = do_setup_param('TOOLCHAIN', Args.toolchain)
+        env = do_setup_param('CONFIG', Args.config)
+        log.debug("env\n%s", env)
+        open('.build-env.sh', 'w').write(env)
+
+
+def restart_in_docker():
+    log.debug("starting docker %s", sys.argv)
+    run_fmt['image'] = Args.image
+    run_fmt['input'] = ''
+    if Args.action == 'shell':
+        run_fmt['input'] = 'i'
+
+    run('docker pull %(image)s')
+    try:
+        run('docker run --rm -h br2-build -v "%(pwd)s":"%(pwd)s" -w "%(pwd)s" '
+            '-v /var/run/docker.sock:/var/run/docker.sock '
+            '-%(input)st %(image)s ' + ' '.join(sys.argv))
+    except Exception as e:
+        log.debug("Error: %s", e)
+        exit(1)
+
+
+def main():
+    if os.path.isfile('/.dockerenv'):
+        b = BuildEnv()
+        b.do(Args.action)
+    else:
+        restart_in_docker()
+
+if __name__ == '__main__':
+    main()
