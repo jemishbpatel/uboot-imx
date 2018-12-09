@@ -508,11 +508,20 @@ uint mmc_get_env_part(struct mmc *mmc)
 
 int board_postclk_init(void)
 {
+	struct anatop_regs *anatop = (struct anatop_regs *)ANATOP_BASE_ADDR;
 	/* NO LDO SOC on i.MX6SLL */
 	if (is_mx6sll())
 		return 0;
 
-	set_ldo_voltage(LDO_SOC, 1175);	/* Set VDDSOC to 1.175V */
+	/* HW Team suggested */
+
+	set_ldo_voltage(LDO_SOC, 1300); /* Set VDDSOC to 1.3V */
+	set_ldo_voltage(LDO_PU, 1300);  /* Set VDDPU to 1.3V */
+	set_ldo_voltage(LDO_ARM, 1300); /* Set VDDARM to 1.3V */
+
+	u32 reg = readl(&anatop->ana_misc0);
+	reg = 0x1c000008;
+	writel(reg, &anatop->ana_misc0); /* Increase 24MHz clock delay from 1ms to 7ms */
 
 	return 0;
 }
